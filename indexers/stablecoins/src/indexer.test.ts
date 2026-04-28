@@ -1,133 +1,254 @@
-import { describe, it } from "vitest";
-import { createTestIndexer, type Account } from "generated";
+import { describe, it, expect, beforeEach } from "vitest";
+import { createTestIndexer } from "generated";
 import { TestHelpers } from "envio";
 const { Addresses } = TestHelpers;
 
-describe("Indexer Testing", () => {
-  it("Should create accounts from ERC20 Transfer events", async (t) => {
+const ZERO_ADDRESS =
+  "0x0000000000000000000000000000000000000000" as `0x${string}`;
+const CHAIN_ID = 1;
+
+// Arbitrary token address — must match one in config.yaml
+const TOKEN_ADDRESS =
+  "0xdAC17F958D2ee523a2206206994597C13D831ec7" as `0x${string}`; // USDT checksummed
+
+const DAY_0_TIMESTAMP = 86400 * 20000; // day 20000
+const DAY_1_TIMESTAMP = 86400 * 20001; // day 20001
+
+function tokenId() {
+  return `${CHAIN_ID}_${TOKEN_ADDRESS}`;
+}
+function dayDataId(dayId: number) {
+  return `${tokenId()}_${dayId}`;
+}
+function holderBalanceId(address: string) {
+  return `${tokenId()}_${address}`;
+}
+function activeAddrId(dayId: number, address: string) {
+  return `${tokenId()}_${dayId}_${address}`;
+}
+
+function makeTransfer(
+  from: `0x${string}`,
+  to: `0x${string}`,
+  value: bigint,
+  timestamp = DAY_0_TIMESTAMP
+) {
+  return {
+    contract: "ERC20" as const,
+    event: "Transfer" as const,
+    params: { from, to, value },
+    block: { timestamp },
+    srcAddress: TOKEN_ADDRESS,
+  };
+}
+
+describe("Mint", () => {
+  it("increases totalSupply and creates receiver HolderBalance", async () => {
     const indexer = createTestIndexer();
+    const receiver = Addresses.mockAddresses[0]! as `0x${string}`;
 
-    t.expect(
-      await indexer.process({
-        chains: {
-          1: {
-            startBlock: 10_861_674,
-            endBlock: 10_861_674,
-          },
+    await indexer.process({
+      chains: {
+        [CHAIN_ID]: {
+          simulate: [makeTransfer(ZERO_ADDRESS, receiver, 1000n)],
         },
-      }),
-      "Should find the first mint at block 10_861_674"
-    ).toMatchInlineSnapshot(`
-      {
-        "changes": [
-          {
-            "Account": {
-              "sets": [
-                {
-                  "balance": -1000000000000000000000000000n,
-                  "id": "0x0000000000000000000000000000000000000000",
-                },
-                {
-                  "balance": 1000000000000000000000000000n,
-                  "id": "0x41653c7d61609D856f29355E404F310Ec4142Cfb",
-                },
-              ],
-            },
-            "block": 10861674,
-            "chainId": 1,
-            "eventsProcessed": 1,
-          },
-        ],
-      }
-    `);
+      },
+    });
 
-    t.expect(
-      await indexer.process({
-        chains: {
-          1: {
-            startBlock: 10_861_766,
-            endBlock: 10_861_766,
-          },
-        },
-      }),
-      "Updates existing account balance on transfer"
-    ).toMatchInlineSnapshot(`
-      {
-        "changes": [
-          {
-            "Account": {
-              "sets": [
-                {
-                  "balance": 999999998000000000000000000n,
-                  "id": "0x41653c7d61609D856f29355E404F310Ec4142Cfb",
-                },
-                {
-                  "balance": 2000000000000000000n,
-                  "id": "0xe5737257D9406019768167C26f5C6123864ceC1e",
-                },
-              ],
-            },
-            "block": 10861766,
-            "chainId": 1,
-            "eventsProcessed": 1,
-          },
-        ],
-      }
-    `);
+    const token = await indexer.Token.get(tokenId());
+    expect(token?.totalSupply).toBe(1000n);
+
+    const receiverBalance = await indexer.HolderBalance.get(holderBalanceId(receiver));
+    expect(receiverBalance?.balance).toBe(1000n);
+
+    // Zero address should not get a HolderBalance
+    const zeroBalance = await indexer.HolderBalance.get(holderBalanceId(ZERO_ADDRESS));
+    expect(zeroBalance).toBeUndefined();
+
+    // Zero address is not a real sender — no DailyActiveAddress
+    const activeAddr = await indexer.DailyActiveAddress.get(
+      activeAddrId(20000, ZERO_ADDRESS)
+    );
+    expect(activeAddr).toBeUndefined();
+
+    const dayData = await indexer.TokenDayData.get(dayDataId(20000));
+    expect(dayData?.dailyMintAmount).toBe(1000n);
+    expect(dayData?.dailyBurnAmount).toBe(0n);
+    expect(dayData?.dailyActiveAddresses).toBe(0);
   });
 });
 
-describe("Transfers", () => {
-  it("Transfer subtracts the from account balance and adds to the to account balance", async (t) => {
+describe("Burn", () => {
+  it("decreases totalSupply and updates sender HolderBalance", async () => {
     const indexer = createTestIndexer();
+    const burner = Addresses.mockAddresses[0]! as `0x${string}`;
 
-    // Get mock addresses from helpers
-    const userAddress1 = Addresses.mockAddresses[0]!;
-    const userAddress2 = Addresses.mockAddresses[1]!;
+    // Seed initial balance
+    indexer.HolderBalance.set({
+      id: holderBalanceId(burner),
+      token_id: tokenId(),
+      chainId: CHAIN_ID,
+      holder: burner,
+      balance: 500n,
+      firstTransferTimestamp: BigInt(DAY_0_TIMESTAMP),
+      lastTransferTimestamp: BigInt(DAY_0_TIMESTAMP),
+    });
+    indexer.Token.set({
+      id: tokenId(),
+      chainId: CHAIN_ID,
+      address: TOKEN_ADDRESS,
+      totalSupply: 500n,
+      lastDayId: 20000,
+    });
 
-    // Make a mock entity to set the initial state of the mock db
-    const mockAccountEntity: Account = {
-      id: userAddress1,
-      balance: 5n,
-    };
-
-    // Set an initial state for the user
-    indexer.Account.set(mockAccountEntity);
-
-    // Create a mock Transfer event from userAddress1 to userAddress2
-    // and process it
     await indexer.process({
       chains: {
-        1: {
+        [CHAIN_ID]: {
+          simulate: [makeTransfer(burner, ZERO_ADDRESS, 200n)],
+        },
+      },
+    });
+
+    const token = await indexer.Token.get(tokenId());
+    expect(token?.totalSupply).toBe(300n);
+
+    const burnerBalance = await indexer.HolderBalance.get(holderBalanceId(burner));
+    expect(burnerBalance?.balance).toBe(300n);
+
+    // Zero address should not get a HolderBalance on burn
+    const zeroBalance = await indexer.HolderBalance.get(holderBalanceId(ZERO_ADDRESS));
+    expect(zeroBalance).toBeUndefined();
+
+    const dayData = await indexer.TokenDayData.get(dayDataId(20000));
+    expect(dayData?.dailyBurnAmount).toBe(200n);
+    expect(dayData?.dailyActiveAddresses).toBe(1);
+  });
+});
+
+describe("Transfer", () => {
+  it("updates both balances, records first/last timestamps, and tracks active address", async () => {
+    const indexer = createTestIndexer();
+    const sender = Addresses.mockAddresses[0]! as `0x${string}`;
+    const receiver = Addresses.mockAddresses[1]! as `0x${string}`;
+
+    indexer.HolderBalance.set({
+      id: holderBalanceId(sender),
+      token_id: tokenId(),
+      chainId: CHAIN_ID,
+      holder: sender,
+      balance: 100n,
+      firstTransferTimestamp: 1000n,
+      lastTransferTimestamp: 1000n,
+    });
+
+    await indexer.process({
+      chains: {
+        [CHAIN_ID]: {
+          simulate: [makeTransfer(sender, receiver, 30n, DAY_0_TIMESTAMP)],
+        },
+      },
+    });
+
+    const senderBalance = await indexer.HolderBalance.get(holderBalanceId(sender));
+    expect(senderBalance?.balance).toBe(70n);
+    expect(senderBalance?.firstTransferTimestamp).toBe(1000n); // preserved
+    expect(senderBalance?.lastTransferTimestamp).toBe(BigInt(DAY_0_TIMESTAMP));
+
+    const receiverBalance = await indexer.HolderBalance.get(holderBalanceId(receiver));
+    expect(receiverBalance?.balance).toBe(30n);
+    expect(receiverBalance?.firstTransferTimestamp).toBe(BigInt(DAY_0_TIMESTAMP));
+
+    const activeAddr = await indexer.DailyActiveAddress.get(activeAddrId(20000, sender));
+    expect(activeAddr).toBeDefined();
+
+    const dayData = await indexer.TokenDayData.get(dayDataId(20000));
+    expect(dayData?.dailyTransferAmount).toBe(30n);
+    expect(dayData?.dailyTransferCount).toBe(1);
+    expect(dayData?.dailyActiveAddresses).toBe(1);
+  });
+
+  it("does not double-count repeated sender in same day", async () => {
+    const indexer = createTestIndexer();
+    const sender = Addresses.mockAddresses[0]! as `0x${string}`;
+    const receiver = Addresses.mockAddresses[1]! as `0x${string}`;
+
+    indexer.HolderBalance.set({
+      id: holderBalanceId(sender),
+      token_id: tokenId(),
+      chainId: CHAIN_ID,
+      holder: sender,
+      balance: 200n,
+      firstTransferTimestamp: 1000n,
+      lastTransferTimestamp: 1000n,
+    });
+
+    await indexer.process({
+      chains: {
+        [CHAIN_ID]: {
           simulate: [
-            {
-              contract: "ERC20",
-              event: "Transfer",
-              params: {
-                from: userAddress1,
-                to: userAddress2,
-                value: 3n,
-              },
-            },
+            makeTransfer(sender, receiver, 10n, DAY_0_TIMESTAMP),
+            makeTransfer(sender, receiver, 10n, DAY_0_TIMESTAMP),
           ],
         },
       },
     });
 
-    // Get the balance of userAddress1 after the transfer
-    const account1 = await indexer.Account.getOrThrow(userAddress1);
-    // Assert the expected balance
-    t.expect(
-      account1.balance,
-      "Should have subtracted transfer amount 3 from userAddress1 balance 5"
-    ).toBe(2n);
+    const dayData = await indexer.TokenDayData.get(dayDataId(20000));
+    expect(dayData?.dailyTransferCount).toBe(2);
+    expect(dayData?.dailyActiveAddresses).toBe(1); // same sender, same day
+  });
+});
 
-    // Get the balance of userAddress2 after the transfer
-    const account2 = await indexer.Account.getOrThrow(userAddress2);
-    // Assert the expected balance
-    t.expect(
-      account2.balance,
-      "Should have added transfer amount 3 to userAddress2 balance 0"
-    ).toBe(3n);
+describe("Day rollover", () => {
+  it("deletes previous day DailyActiveAddress entries and starts fresh counters", async () => {
+    const indexer = createTestIndexer();
+    const sender = Addresses.mockAddresses[0]! as `0x${string}`;
+    const newSender = Addresses.mockAddresses[1]! as `0x${string}`;
+    const receiver = Addresses.mockAddresses[2]! as `0x${string}`;
+
+    // Seed state at end of day 20000
+    indexer.Token.set({
+      id: tokenId(),
+      chainId: CHAIN_ID,
+      address: TOKEN_ADDRESS,
+      totalSupply: 1000n,
+      lastDayId: 20000,
+    });
+    indexer.DailyActiveAddress.set({
+      id: activeAddrId(20000, sender),
+      token_id: tokenId(),
+      chainId: CHAIN_ID,
+      date: 20000,
+      address: sender,
+    });
+    indexer.HolderBalance.set({
+      id: holderBalanceId(newSender),
+      token_id: tokenId(),
+      chainId: CHAIN_ID,
+      holder: newSender,
+      balance: 500n,
+      firstTransferTimestamp: BigInt(DAY_0_TIMESTAMP),
+      lastTransferTimestamp: BigInt(DAY_0_TIMESTAMP),
+    });
+
+    await indexer.process({
+      chains: {
+        [CHAIN_ID]: {
+          simulate: [makeTransfer(newSender, receiver, 50n, DAY_1_TIMESTAMP)],
+        },
+      },
+    });
+
+    // Old DailyActiveAddress should be deleted
+    const oldEntry = await indexer.DailyActiveAddress.get(activeAddrId(20000, sender));
+    expect(oldEntry).toBeUndefined();
+
+    // New day has only the new sender
+    const newDayData = await indexer.TokenDayData.get(dayDataId(20001));
+    expect(newDayData?.dailyActiveAddresses).toBe(1);
+    expect(newDayData?.dailyTransferCount).toBe(1);
+
+    const newEntry = await indexer.DailyActiveAddress.get(activeAddrId(20001, newSender));
+    expect(newEntry).toBeDefined();
   });
 });

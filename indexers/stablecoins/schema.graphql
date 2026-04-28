@@ -1,19 +1,39 @@
-type Account {
-  # id is the address of the account
-  id: ID!
-  # approvals are a list of approvals that this account has given
-  approvals: [Approval!]! @derivedFrom(field: "owner")
-  # account balance of tokens
-  balance: BigInt!
+type Token {
+  id: ID! # {chainId}_{tokenAddress}
+  chainId: Int!
+  address: String!
+  totalSupply: BigInt!
+  lastDayId: Int!
+  dayData: [TokenDayData!]! @derivedFrom(field: "token")
+  holders: [HolderBalance!]! @derivedFrom(field: "token")
 }
 
-type Approval {
-  # id is the owner address and spender address [owner-spender]
-  id: ID!
-  # amount is the amount of tokens approved
-  amount: BigInt!
-  # owner is the account that approved the tokens
-  owner: Account!
-  # spender is the account that is approved to spend the tokens
-  spender: Account!
+type TokenDayData @index(fields: ["token", ["date", "DESC"]]) {
+  id: ID! # {chainId}_{tokenAddress}_{dayId}
+  token: Token! @index
+  chainId: Int!
+  date: Int! # Unix day (timestamp / 86400)
+  dailyMintAmount: BigInt!
+  dailyBurnAmount: BigInt!
+  dailyTransferAmount: BigInt!
+  dailyTransferCount: Int!
+  dailyActiveAddresses: Int!
+}
+
+type HolderBalance {
+  id: ID! # {chainId}_{tokenAddress}_{holderAddress}
+  token: Token! @index
+  chainId: Int!
+  holder: String! @index
+  balance: BigInt!
+  firstTransferTimestamp: BigInt!
+  lastTransferTimestamp: BigInt!
+}
+
+type DailyActiveAddress {
+  id: ID! # {chainId}_{tokenAddress}_{dayId}_{address}
+  token: Token! @index
+  chainId: Int!
+  date: Int! @index
+  address: String! @index
 }
