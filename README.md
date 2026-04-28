@@ -8,8 +8,8 @@ Built with [HyperIndex](https://envio.dev).
 
 | Indexer | Assets tracked | Status |
 |---------|--------------- |--------|
-| `indexers/stablecoins` | USDT, USDC, USDS, Ethena USDe, Dai | In-Progress |
-| `indexers/asset-backed-credit` | Syrup USDC, Syrup USDT | Todo |
+| `indexers/stablecoins` | USDT, USDC, USDS, Ethena USDe, Dai | `In-Progress` |
+| `indexers/asset-backed-credit` | Syrup USDC, Syrup USDT | `Todo` |
 
 ## Getting started
 
