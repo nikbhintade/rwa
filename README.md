@@ -18,3 +18,4 @@ cd indexers/<name>
 pnpm install
 pnpm dev
 ```
+
