@@ -1,4 +1,4 @@
-import { ERC20, USDT, type handlerContext } from "generated";
+import { indexer, type EvmOnEventContext } from "envio";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -9,7 +9,7 @@ async function handleTransfer(
     block: { timestamp: number };
     params: { from: string; to: string; value: bigint };
   },
-  context: handlerContext,
+  context: EvmOnEventContext,
 ) {
   const { from, to, value } = event.params;
   const chainId = event.chainId;
@@ -118,7 +118,7 @@ async function handleSupplyChange(
     block: { timestamp: number };
     params: { amount: bigint };
   },
-  context: handlerContext,
+  context: EvmOnEventContext,
   direction: "mint" | "burn",
 ) {
   const { amount } = event.params;
@@ -176,18 +176,30 @@ async function handleSupplyChange(
   });
 }
 
-ERC20.Transfer.handler(async ({ event, context }) => {
-  await handleTransfer(event, context);
-});
+indexer.onEvent(
+  { contract: "ERC20", event: "Transfer" },
+  async ({ event, context }) => {
+    await handleTransfer(event, context);
+  },
+);
 
-USDT.Transfer.handler(async ({ event, context }) => {
-  await handleTransfer(event, context);
-});
+indexer.onEvent(
+  { contract: "USDT", event: "Transfer" },
+  async ({ event, context }) => {
+    await handleTransfer(event, context);
+  },
+);
 
-USDT.Issue.handler(async ({ event, context }) => {
-  await handleSupplyChange(event, context, "mint");
-});
+indexer.onEvent(
+  { contract: "USDT", event: "Issue" },
+  async ({ event, context }) => {
+    await handleSupplyChange(event, context, "mint");
+  },
+);
 
-USDT.Redeem.handler(async ({ event, context }) => {
-  await handleSupplyChange(event, context, "burn");
-});
+indexer.onEvent(
+  { contract: "USDT", event: "Redeem" },
+  async ({ event, context }) => {
+    await handleSupplyChange(event, context, "burn");
+  },
+);

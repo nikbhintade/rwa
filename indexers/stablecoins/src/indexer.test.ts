@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createTestIndexer } from "generated";
-import { TestHelpers } from "envio";
+import { createTestIndexer, TestHelpers } from "envio";
 const { Addresses } = TestHelpers;
 
 const ZERO_ADDRESS =
