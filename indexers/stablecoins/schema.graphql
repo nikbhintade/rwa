@@ -1,18 +1,19 @@
 type Token {
   id: ID! # {chainId}_{tokenAddress}
   chainId: Int!
-  address: String!
+  address: String! @index
   totalSupply: BigInt!
   lastDayId: Int!
   dayData: [TokenDayData!]! @derivedFrom(field: "token")
   holders: [HolderBalance!]! @derivedFrom(field: "token")
 }
 
-type TokenDayData @index(fields: ["token", ["date", "DESC"]]) {
+type TokenDayData @index(fields: ["token", ["date", "DESC"]]) @index(fields: [["date", "DESC"]]) {
   id: ID! # {chainId}_{tokenAddress}_{dayId}
   token: Token! @index
   chainId: Int!
-  date: Int! # Unix day (timestamp / 86400)
+  date: Int! # Midnight UTC timestamp of the day (dayId * 86400)
+  dailyTotalSupply: BigInt! # End-of-day totalSupply snapshot
   dailyMintAmount: BigInt!
   dailyBurnAmount: BigInt!
   dailyTransferAmount: BigInt!
@@ -20,7 +21,7 @@ type TokenDayData @index(fields: ["token", ["date", "DESC"]]) {
   dailyActiveAddresses: Int!
 }
 
-type HolderBalance {
+type HolderBalance @index(fields: ["token", ["balance", "DESC"]]) {
   id: ID! # {chainId}_{tokenAddress}_{holderAddress}
   token: Token! @index
   chainId: Int!

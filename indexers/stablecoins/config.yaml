@@ -5,14 +5,21 @@ contracts:
   - name: ERC20
     events:
       - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+  - name: USDT
+    events:
+      - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+      - event: "Issue(uint256 amount)"
+      - event: "Redeem(uint256 amount)"
 chains:
   - id: 1 # Ethereum Mainnet
     start_block: 0
     contracts:
+      - name: USDT
+        address:
+          ["0xdac17f958d2ee523a2206206994597c13d831ec7"] # USDT
       - name: ERC20
         address:
           [
-            "0xdac17f958d2ee523a2206206994597c13d831ec7", # USDT
             "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
             "0xdc035d45d973e3ec169d2276ddab16f1e407384f", # USDS
             "0x4c9edd5852cd905f086c759e8383e09bff1e68b3", # Ethena USD
