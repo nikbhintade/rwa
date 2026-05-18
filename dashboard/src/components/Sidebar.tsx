@@ -54,15 +54,16 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
   }
 
   return (
-    <aside className="flex h-full w-[20%] min-w-[280px] flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
-      <header className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-4">
-        <div className="h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-[0_0_8px_var(--color-accent)]" />
-        <h1 className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-primary)]">
+    <aside className="flex h-full w-[20%] min-w-[300px] flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
+      <header className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3.5">
+        <div className="h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--color-accent)]" />
+        <h1 className="text-[12.5px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-primary)]">
           RWA Radar
         </h1>
         {loading && (
-          <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
-            Loading…
+          <span className="ml-auto flex items-center gap-1.5 text-[9.5px] uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
+            <span className="h-1 w-1 animate-pulse rounded-full bg-[var(--color-text-muted)]" />
+            Loading
           </span>
         )}
       </header>
@@ -80,17 +81,17 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_88px_84px] items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
+      <div className="grid grid-cols-[1fr_88px_84px] items-center gap-2 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-base)]/40 px-3 py-2 text-[9.5px] font-medium uppercase tracking-[0.1em] text-[var(--color-text-tertiary)]">
         <span>Token</span>
         <button
           onClick={() => toggleSort("transfer")}
-          className="flex items-center justify-end gap-1 hover:text-[var(--color-text-secondary)]"
+          className="flex items-center justify-end gap-1 transition hover:text-[var(--color-text-secondary)]"
         >
           Transfer 7d {sortIndicator(sortKey, "transfer", sortDir)}
         </button>
         <button
           onClick={() => toggleSort("supply")}
-          className="flex items-center justify-end gap-1 hover:text-[var(--color-text-secondary)]"
+          className="flex items-center justify-end gap-1 transition hover:text-[var(--color-text-secondary)]"
         >
           Supply {sortIndicator(sortKey, "supply", sortDir)}
         </button>
@@ -114,8 +115,11 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
         )}
       </div>
 
-      <footer className="border-t border-[var(--color-border-subtle)] px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
-        {rows.length} of {tokens.length} tokens
+      <footer className="flex items-center justify-between border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-base)]/40 px-3 py-2 text-[9.5px] uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
+        <span>
+          {rows.length} of {tokens.length} tokens
+        </span>
+        <span className="font-mono">v1.0</span>
       </footer>
     </aside>
   );
@@ -140,31 +144,34 @@ function Row({
   return (
     <button
       onClick={onClick}
-      className={`grid w-full grid-cols-[1fr_88px_84px] items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2.5 text-left transition hover:bg-[var(--color-bg-hover)] ${
+      className={`group relative grid w-full grid-cols-[1fr_88px_84px] items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2.5 text-left transition hover:bg-[var(--color-bg-hover)] ${
         selected ? "bg-[var(--color-bg-elevated)]" : ""
       }`}
     >
+      {selected && (
+        <span className="absolute left-0 top-0 h-full w-[2px] bg-[var(--color-accent)]" />
+      )}
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">
+        <div className="truncate text-[12.5px] font-semibold leading-tight text-[var(--color-text-primary)]">
           {token.symbol}
         </div>
-        <div className="truncate text-[10.5px] text-[var(--color-text-tertiary)]">
+        <div className="truncate text-[10.5px] leading-tight text-[var(--color-text-tertiary)]">
           {token.name}
         </div>
       </div>
 
-      <div className="flex flex-col items-end">
-        <span className="font-mono text-[11px] leading-none text-[var(--color-text-secondary)]">
+      <div className="flex flex-col items-end gap-1">
+        <span className="font-mono text-[11px] leading-none tabular-nums text-[var(--color-text-secondary)]">
           {sum != null ? formatCompact(sum) : "—"}
         </span>
-        <div className="mt-1 h-[18px]">
+        <div className="h-[18px]">
           {series.length >= 2 && (
             <Sparkline data={series} positive={positive} />
           )}
         </div>
       </div>
 
-      <div className="text-right font-mono text-[12px] text-[var(--color-text-primary)]">
+      <div className="text-right font-mono text-[12px] tabular-nums text-[var(--color-text-primary)]">
         {supply != null ? formatCompact(supply) : "—"}
       </div>
     </button>

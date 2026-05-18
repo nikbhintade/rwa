@@ -26,8 +26,10 @@ export function formatUnits(raw: string | bigint | number | null | undefined, de
   }
 }
 
-function todayDayId(): number {
-  return Math.floor(Date.now() / (86400 * 1000));
+const DAY_SECS = 86400;
+
+function todayMidnightSecs(): number {
+  return Math.floor(Date.now() / 1000 / DAY_SECS) * DAY_SECS;
 }
 
 const BATCH_QUERY = `query BatchStats($addrs: [String!]!, $minDate: Int!) {
@@ -66,7 +68,7 @@ function caseInsensitiveLookup(map: Map<string, Token>, addr: string): Token | u
 
 export async function fetchAllStats(tokens: Token[]): Promise<Record<string, TokenStats>> {
   const addrs = tokens.map((t) => t.address);
-  const minDate = todayDayId() - 7;
+  const minDate = todayMidnightSecs() - 7 * DAY_SECS;
   const data = await gql<BatchRaw>(BATCH_QUERY, { addrs, minDate });
 
   const tokensByAddr = new Map<string, Token>();
@@ -136,7 +138,7 @@ type DetailRaw = {
 };
 
 export async function fetchTokenDetail(token: Token): Promise<TokenStats> {
-  const minDate = todayDayId() - 365;
+  const minDate = todayMidnightSecs() - 365 * DAY_SECS;
   const data = await gql<DetailRaw>(DETAIL_QUERY, { addr: token.address, minDate });
   const supply = data.Token[0]?.totalSupply ?? null;
   const days = data.TokenDayData.map((d) => ({
@@ -158,29 +160,5 @@ export function aggregateByTimeframe(days: TokenDay[], t: Timeframe): TokenDay[]
   const sorted = [...days].sort((a, b) => a.date - b.date);
   if (t === "weekly") return sorted.slice(-7);
   if (t === "monthly") return sorted.slice(-30);
-  const recent = sorted.slice(-365);
-  const buckets = new Map<string, TokenDay>();
-  for (const d of recent) {
-    const date = new Date(d.date * 86400 * 1000);
-    const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth()).padStart(2, "0")}`;
-    const monthStartDayId = Math.floor(
-      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1) / (86400 * 1000),
-    );
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.dailyTransferAmount += d.dailyTransferAmount;
-      existing.dailyTransferCount += d.dailyTransferCount;
-      existing.dailyMintAmount += d.dailyMintAmount;
-      existing.dailyBurnAmount += d.dailyBurnAmount;
-    } else {
-      buckets.set(key, {
-        date: monthStartDayId,
-        dailyTransferAmount: d.dailyTransferAmount,
-        dailyTransferCount: d.dailyTransferCount,
-        dailyMintAmount: d.dailyMintAmount,
-        dailyBurnAmount: d.dailyBurnAmount,
-      });
-    }
-  }
-  return Array.from(buckets.values()).sort((a, b) => a.date - b.date);
+  return sorted.slice(-365);
 }

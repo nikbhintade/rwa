@@ -1,4 +1,16 @@
 import { useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  Brush,
+  CartesianGrid,
+  Cell,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { Token, TokenDay, TokenStats } from "../types";
 import { formatCompact } from "../lib/format";
 import { aggregateByTimeframe, type Timeframe } from "../lib/gql";
@@ -15,43 +27,111 @@ type Props = {
 export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
   const [tab, setTab] = useState<Tab>("volume");
   const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
+  const [copied, setCopied] = useState(false);
 
   const loading = !detailStats;
-  const error: string | null = null;
-
   const supply = detailStats?.totalSupply ?? sidebarStats?.totalSupply ?? null;
-  const days = useMemo(() => {
-    const base = detailStats?.days ?? sidebarStats?.days ?? [];
-    return aggregateByTimeframe(base, timeframe);
-  }, [detailStats, sidebarStats, timeframe]);
+
+  const allDays = useMemo(
+    () => detailStats?.days ?? sidebarStats?.days ?? [],
+    [detailStats, sidebarStats],
+  );
+  const days = useMemo(
+    () => aggregateByTimeframe(allDays, timeframe),
+    [allDays, timeframe],
+  );
+  const prevDays = useMemo(
+    () => prevPeriodDays(allDays, timeframe),
+    [allDays, timeframe],
+  );
 
   const totalTransfer = days.reduce((a, d) => a + d.dailyTransferAmount, 0);
   const totalCount = days.reduce((a, d) => a + d.dailyTransferCount, 0);
+  const prevTransfer = prevDays.reduce((a, d) => a + d.dailyTransferAmount, 0);
+  const prevCount = prevDays.reduce((a, d) => a + d.dailyTransferCount, 0);
+  const transferDelta = pctDelta(totalTransfer, prevTransfer);
+  const countDelta = pctDelta(totalCount, prevCount);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(token.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      <header className="flex items-baseline gap-3">
-        <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
-          {token.symbol}
-        </h2>
-        <span className="text-[12px] text-[var(--color-text-tertiary)]">
-          {token.name}
-        </span>
-        {loading && (
-          <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
-            Loading…
+    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 p-6">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--color-border-subtle)] pb-4">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-[24px] font-semibold leading-none text-[var(--color-text-primary)]">
+            {token.symbol}
+          </h2>
+          <span className="text-[13px] text-[var(--color-text-secondary)]">
+            {token.name}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2 py-1">
+          <span className="font-mono text-[10.5px] text-[var(--color-text-tertiary)]">
+            {shortAddr(token.address)}
+          </span>
+          <button
+            onClick={handleCopy}
+            title="Copy address"
+            className="text-[var(--color-text-muted)] transition hover:text-[var(--color-text-primary)]"
+          >
+            <CopyIcon />
+          </button>
+          <a
+            href={`https://etherscan.io/token/${token.address}`}
+            target="_blank"
+            rel="noreferrer"
+            title="View on Etherscan"
+            className="text-[var(--color-text-muted)] transition hover:text-[var(--color-text-primary)]"
+          >
+            <ExternalIcon />
+          </a>
+        </div>
+        {copied && (
+          <span className="text-[10px] uppercase tracking-wider text-[var(--color-pos)]">
+            Copied
           </span>
         )}
+        <span className="rounded-sm border border-[var(--color-border-subtle)] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
+          Ethereum
+        </span>
+        <div className="ml-auto flex items-center gap-3">
+          {loading && (
+            <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+              Loading…
+            </span>
+          )}
+        </div>
       </header>
 
-      <div className="grid w-full max-w-3xl grid-cols-3 gap-3">
-        <StatBox label="Total Supply" value={supply != null ? formatCompact(supply) : null} unit={token.symbol} />
-        <StatBox label={`${tfLabel(timeframe)} Transfer Amount`} value={days.length ? formatCompact(totalTransfer) : null} unit={token.symbol} />
-        <StatBox label={`${tfLabel(timeframe)} Transfer Count`} value={days.length ? totalCount.toLocaleString() : null} />
+      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <StatBox
+          label="Total Supply"
+          value={supply != null ? formatCompact(supply) : null}
+          unit={token.symbol}
+        />
+        <StatBox
+          label={`${tfLabel(timeframe)} Transfer Amount`}
+          value={days.length ? formatCompact(totalTransfer) : null}
+          unit={token.symbol}
+          delta={prevDays.length ? transferDelta : null}
+        />
+        <StatBox
+          label={`${tfLabel(timeframe)} Transfer Count`}
+          value={days.length ? totalCount.toLocaleString() : null}
+          delta={prevDays.length ? countDelta : null}
+        />
       </div>
 
-      <section className="w-full max-w-3xl">
-        <div className="mb-3 flex items-center justify-between gap-3">
+      <section className="flex w-full flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <TimeframeToggle value={timeframe} onChange={setTimeframe} />
           <DownloadMenu
             token={token}
@@ -62,31 +142,28 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
         </div>
 
         <Tabs value={tab} onChange={setTab} />
-        <div className="rounded-b-md rounded-tr-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] p-4">
-          {error ? (
-            <div className="py-8 text-center text-[12px] text-[var(--color-neg)]">
-              {error}
-            </div>
-          ) : days.length === 0 ? (
+
+        <div className="w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
+          {days.length === 0 ? (
             <div className="py-12 text-center text-[12px] text-[var(--color-text-muted)]">
               {loading ? "Loading…" : "No data"}
             </div>
           ) : tab === "count" ? (
-            <BarChart
-              values={days.map((d) => d.dailyTransferCount)}
-              dates={days.map((d) => d.date)}
+            <SeriesChart
+              days={days}
               timeframe={timeframe}
+              valueKey="dailyTransferCount"
               format={(v) => v.toLocaleString()}
-              label="Transfers / period"
+              label="Transfers"
               color="var(--color-accent)"
             />
           ) : tab === "volume" ? (
-            <BarChart
-              values={days.map((d) => d.dailyTransferAmount)}
-              dates={days.map((d) => d.date)}
+            <SeriesChart
+              days={days}
               timeframe={timeframe}
+              valueKey="dailyTransferAmount"
               format={(v) => `${formatCompact(v)} ${token.symbol}`}
-              label="Volume / period"
+              label="Volume"
               color="var(--color-accent)"
             />
           ) : (
@@ -94,23 +171,44 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
           )}
         </div>
       </section>
-
-      <div className="font-mono text-[10.5px] text-[var(--color-text-muted)]">
-        {token.address}
-      </div>
     </div>
   );
 }
 
 function tfLabel(t: Timeframe): string {
-  return t === "weekly" ? "7d" : t === "monthly" ? "30d" : "12mo";
+  return t === "weekly" ? "7d" : t === "monthly" ? "30d" : "365d";
 }
 
-function TimeframeToggle({ value, onChange }: { value: Timeframe; onChange: (t: Timeframe) => void }) {
+function prevPeriodDays(all: TokenDay[], t: Timeframe): TokenDay[] {
+  const sorted = [...all].sort((a, b) => a.date - b.date);
+  const len = t === "weekly" ? 7 : t === "monthly" ? 30 : 365;
+  const end = sorted.length - len;
+  if (end <= 0) return [];
+  const start = Math.max(0, end - len);
+  return sorted.slice(start, end);
+}
+
+function pctDelta(curr: number, prev: number): number | null {
+  if (!Number.isFinite(curr) || !Number.isFinite(prev)) return null;
+  if (prev === 0) return curr === 0 ? 0 : null;
+  return ((curr - prev) / prev) * 100;
+}
+
+function shortAddr(a: string): string {
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function TimeframeToggle({
+  value,
+  onChange,
+}: {
+  value: Timeframe;
+  onChange: (t: Timeframe) => void;
+}) {
   const opts: { key: Timeframe; label: string }[] = [
-    { key: "weekly", label: "Weekly" },
-    { key: "monthly", label: "Monthly" },
-    { key: "yearly", label: "Yearly" },
+    { key: "weekly", label: "7D" },
+    { key: "monthly", label: "30D" },
+    { key: "yearly", label: "1Y" },
   ];
   return (
     <div className="flex rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] p-0.5">
@@ -120,7 +218,7 @@ function TimeframeToggle({ value, onChange }: { value: Timeframe; onChange: (t: 
           <button
             key={o.key}
             onClick={() => onChange(o.key)}
-            className={`rounded px-3 py-1 text-[11px] font-medium transition ${
+            className={`rounded px-3 py-1 text-[11px] font-medium tracking-wide transition ${
               active
                 ? "bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)]"
                 : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
@@ -185,21 +283,21 @@ function DownloadMenu({
 
 function Tabs({ value, onChange }: { value: Tab; onChange: (t: Tab) => void }) {
   const tabs: { key: Tab; label: string }[] = [
-    { key: "volume", label: "Daily Volume" },
-    { key: "count", label: "Daily Count" },
+    { key: "volume", label: "Volume" },
+    { key: "count", label: "Transfers" },
     { key: "mintburn", label: "Mint / Burn" },
   ];
   return (
-    <div className="flex gap-0 border-b border-[var(--color-border-default)]">
+    <div className="flex gap-6 border-b border-[var(--color-border-subtle)]">
       {tabs.map((t) => {
         const active = value === t.key;
         return (
           <button
             key={t.key}
             onClick={() => onChange(t.key)}
-            className={`-mb-px border border-b-0 px-3 py-2 text-[11px] font-medium uppercase tracking-wider transition ${
+            className={`-mb-px border-b-2 px-0.5 py-2 text-[11px] font-medium uppercase tracking-[0.08em] transition ${
               active
-                ? "border-[var(--color-border-default)] bg-[var(--color-bg-surface)] text-[var(--color-text-primary)]"
+                ? "border-[var(--color-accent)] text-[var(--color-text-primary)]"
                 : "border-transparent text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
             }`}
           >
@@ -211,15 +309,30 @@ function Tabs({ value, onChange }: { value: Tab; onChange: (t: Tab) => void }) {
   );
 }
 
-function StatBox({ label, value, unit }: { label: string; value: string | null; unit?: string }) {
+function StatBox({
+  label,
+  value,
+  unit,
+  delta,
+}: {
+  label: string;
+  value: string | null;
+  unit?: string;
+  delta?: number | null;
+}) {
   return (
-    <div className="rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-4 py-3">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
-        {label}
+    <div className="rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+          {label}
+        </div>
+        {delta != null && Number.isFinite(delta) && (
+          <DeltaPill value={delta} />
+        )}
       </div>
-      <div className="mt-2 font-mono text-[20px] font-medium tabular-nums text-[var(--color-text-primary)]">
+      <div className="mt-2 font-mono text-[22px] font-medium leading-none tabular-nums text-[var(--color-text-primary)]">
         {value == null ? (
-          <span className="text-[var(--color-text-muted)] text-[14px]">—</span>
+          <span className="text-[14px] text-[var(--color-text-muted)]">—</span>
         ) : (
           <>
             {value}
@@ -235,78 +348,146 @@ function StatBox({ label, value, unit }: { label: string; value: string | null; 
   );
 }
 
-function BarChart({
-  values,
-  dates,
+function DeltaPill({ value }: { value: number }) {
+  const positive = value >= 0;
+  const color = positive ? "var(--color-pos)" : "var(--color-neg)";
+  const bg = positive ? "var(--color-pos-bg)" : "var(--color-neg-bg)";
+  return (
+    <span
+      className="rounded-sm px-1.5 py-[2px] font-mono text-[10px] font-medium tabular-nums"
+      style={{ color, background: bg }}
+    >
+      {positive ? "▲" : "▼"} {Math.abs(value).toFixed(1)}%
+    </span>
+  );
+}
+
+type ChartDatum = {
+  date: number;
+  value: number;
+  label: string;
+};
+
+function SeriesChart({
+  days,
   timeframe,
+  valueKey,
   format,
   label,
   color,
 }: {
-  values: number[];
-  dates: number[];
+  days: TokenDay[];
   timeframe: Timeframe;
+  valueKey: "dailyTransferAmount" | "dailyTransferCount";
   format: (v: number) => string;
   label: string;
   color: string;
 }) {
-  const width = 720;
-  const height = 180;
-  const padY = 10;
-  const safe = (v: number) => (Number.isFinite(v) ? v : 0);
-  const safeVals = values.map(safe);
-  const max = Math.max(...safeVals, 0);
-  const colW = width / safeVals.length;
-  const barW = colW * 0.65;
+  const data: ChartDatum[] = days.map((d) => ({
+    date: d.date,
+    value: Number.isFinite(d[valueKey]) ? d[valueKey] : 0,
+    label: formatAxis(d.date, timeframe),
+  }));
+  const yearly = timeframe === "yearly";
+  const max = Math.max(...data.map((d) => d.value), 0);
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
-          {label}
+        <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+          {label} · {tfLabel(timeframe)}
         </span>
         <span className="font-mono text-[10px] text-[var(--color-text-muted)]">
           max {format(max)}
         </span>
       </div>
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        className="overflow-visible"
-        aria-hidden="true"
-      >
-        <line
-          x1={0}
-          y1={height - padY}
-          x2={width}
-          y2={height - padY}
-          stroke="var(--color-border-default)"
-          strokeWidth={1}
-        />
-        {safeVals.map((v, i) => {
-          const cx = i * colW + colW / 2;
-          const x = cx - barW / 2;
-          const h = max > 0 ? (v / max) * (height - padY * 2) : 0;
-          const y = height - padY - h;
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={y}
-              width={barW}
-              height={h}
-              fill={color}
-              rx={1.5}
-            >
-              <title>{`${formatAxis(dates[i], timeframe)}: ${format(v)}`}</title>
-            </rect>
-          );
-        })}
-      </svg>
-      <AxisLabels dates={dates} timeframe={timeframe} />
+      <ResponsiveContainer width="100%" height={yearly ? 320 : 260}>
+        <BarChart
+          data={data}
+          margin={{ top: 8, right: 8, left: 8, bottom: yearly ? 28 : 8 }}
+          barCategoryGap={yearly ? "5%" : "20%"}
+        >
+          <defs>
+            <linearGradient id="barFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.95} />
+              <stop offset="100%" stopColor={color} stopOpacity={0.55} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            strokeDasharray="2 4"
+            stroke="var(--color-border-subtle)"
+            vertical={false}
+          />
+          <XAxis
+            dataKey="label"
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={{ stroke: "var(--color-border-default)" }}
+            interval="preserveStartEnd"
+            minTickGap={yearly ? 40 : 20}
+          />
+          <YAxis
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) =>
+              valueKey === "dailyTransferCount"
+                ? Number(v).toLocaleString()
+                : formatCompact(Number(v))
+            }
+            width={56}
+          />
+          <Tooltip
+            cursor={{ fill: "var(--color-bg-hover)", opacity: 0.6 }}
+            contentStyle={{
+              background: "var(--color-bg-elevated)",
+              border: "1px solid var(--color-border-default)",
+              borderRadius: 6,
+              fontSize: 11,
+              fontFamily: "var(--font-mono)",
+              padding: "6px 10px",
+            }}
+            labelStyle={{
+              color: "var(--color-text-tertiary)",
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 2,
+            }}
+            itemStyle={{ color: "var(--color-text-primary)" }}
+            formatter={(v) => [format(Number(v)), label] as [string, string]}
+          />
+          <Bar
+            dataKey="value"
+            fill="url(#barFill)"
+            radius={[2, 2, 0, 0]}
+            isAnimationActive={false}
+          />
+          {yearly && (
+            <Brush
+              dataKey="label"
+              height={22}
+              stroke="var(--color-border-strong)"
+              fill="var(--color-bg-base)"
+              travellerWidth={8}
+              tickFormatter={() => ""}
+              y={290}
+            />
+          )}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
+
+type MintBurnDatum = {
+  date: number;
+  label: string;
+  mint: number;
+  burn: number;
+};
 
 function MintBurnChart({
   days,
@@ -317,25 +498,22 @@ function MintBurnChart({
   symbol: string;
   timeframe: Timeframe;
 }) {
-  const width = 720;
-  const height = 220;
-  const padY = 10;
-  const midY = height / 2;
-  const usableY = midY - padY;
   const safe = (v: number) => (Number.isFinite(v) ? v : 0);
-  const mints = days.map((d) => safe(d.dailyMintAmount));
-  const burns = days.map((d) => safe(d.dailyBurnAmount));
-  const maxAbs = Math.max(...mints, ...burns, 0);
-  const totalMint = mints.reduce((a, v) => a + v, 0);
-  const totalBurn = burns.reduce((a, v) => a + v, 0);
-  const colW = width / days.length;
-  const barW = colW * 0.55;
+  const data: MintBurnDatum[] = days.map((d) => ({
+    date: d.date,
+    label: formatAxis(d.date, timeframe),
+    mint: safe(d.dailyMintAmount),
+    burn: -safe(d.dailyBurnAmount),
+  }));
+  const totalMint = data.reduce((a, d) => a + d.mint, 0);
+  const totalBurn = -data.reduce((a, d) => a + d.burn, 0);
+  const yearly = timeframe === "yearly";
 
   if (totalMint === 0 && totalBurn === 0) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
-          Mint / Burn — {tfLabel(timeframe)}
+        <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+          Mint / Burn · {tfLabel(timeframe)}
         </div>
         <div className="py-8 text-center text-[12px] text-[var(--color-text-muted)]">
           No mint or burn activity in this period
@@ -345,94 +523,192 @@ function MintBurnChart({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
-          Mint / Burn — {tfLabel(timeframe)}
+        <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+          Mint / Burn · {tfLabel(timeframe)}
         </span>
-        <span className="font-mono text-[10px] text-[var(--color-text-muted)]">
-          <span className="text-[var(--color-pos)]">+{formatCompact(totalMint)}</span>
-          {" / "}
-          <span className="text-[var(--color-neg)]">-{formatCompact(totalBurn)}</span>
-          {" "}{symbol}
+        <span className="font-mono text-[10px]">
+          <span className="text-[var(--color-pos)]">
+            +{formatCompact(totalMint)}
+          </span>
+          <span className="text-[var(--color-text-muted)]"> / </span>
+          <span className="text-[var(--color-neg)]">
+            -{formatCompact(totalBurn)}
+          </span>
+          <span className="ml-1 text-[var(--color-text-tertiary)]">{symbol}</span>
         </span>
       </div>
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        className="overflow-visible"
-        aria-hidden="true"
-      >
-        <line
-          x1={0}
-          y1={midY}
-          x2={width}
-          y2={midY}
-          stroke="var(--color-border-default)"
-          strokeWidth={1}
-        />
-        {days.map((d, i) => {
-          const cx = i * colW + colW / 2;
-          const x = cx - barW / 2;
-          const m = safe(d.dailyMintAmount);
-          const b = safe(d.dailyBurnAmount);
-          const mintH = maxAbs > 0 ? (m / maxAbs) * usableY : 0;
-          const burnH = maxAbs > 0 ? (b / maxAbs) * usableY : 0;
-          return (
-            <g key={d.date}>
-              {mintH > 0 && (
-                <rect
-                  x={x}
-                  y={midY - mintH}
-                  width={barW}
-                  height={mintH}
-                  fill="var(--color-pos)"
-                  rx={1.5}
-                >
-                  <title>{`${formatAxis(d.date, timeframe)} mint: +${formatCompact(m)} ${symbol}`}</title>
-                </rect>
-              )}
-              {burnH > 0 && (
-                <rect
-                  x={x}
-                  y={midY}
-                  width={barW}
-                  height={burnH}
-                  fill="var(--color-neg)"
-                  rx={1.5}
-                >
-                  <title>{`${formatAxis(d.date, timeframe)} burn: -${formatCompact(b)} ${symbol}`}</title>
-                </rect>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-      <AxisLabels dates={days.map((d) => d.date)} timeframe={timeframe} />
+      <ResponsiveContainer width="100%" height={yearly ? 340 : 280}>
+        <BarChart
+          data={data}
+          margin={{ top: 8, right: 8, left: 8, bottom: yearly ? 28 : 8 }}
+          stackOffset="sign"
+          barCategoryGap={yearly ? "5%" : "20%"}
+        >
+          <CartesianGrid
+            strokeDasharray="2 4"
+            stroke="var(--color-border-subtle)"
+            vertical={false}
+          />
+          <XAxis
+            dataKey="label"
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={{ stroke: "var(--color-border-default)" }}
+            interval="preserveStartEnd"
+            minTickGap={yearly ? 40 : 20}
+          />
+          <YAxis
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => formatCompact(Math.abs(Number(v)))}
+            width={56}
+          />
+          <ReferenceLine y={0} stroke="var(--color-border-default)" />
+          <Tooltip
+            cursor={{ fill: "var(--color-bg-hover)", opacity: 0.6 }}
+            contentStyle={{
+              background: "var(--color-bg-elevated)",
+              border: "1px solid var(--color-border-default)",
+              borderRadius: 6,
+              fontSize: 11,
+              fontFamily: "var(--font-mono)",
+              padding: "6px 10px",
+            }}
+            labelStyle={{
+              color: "var(--color-text-tertiary)",
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 2,
+            }}
+            itemStyle={{ color: "var(--color-text-primary)" }}
+            formatter={(v, name) => {
+              const abs = Math.abs(Number(v));
+              const sign = name === "Burn" ? "-" : "+";
+              return [`${sign}${formatCompact(abs)} ${symbol}`, String(name)] as [string, string];
+            }}
+          />
+          <Bar
+            dataKey="mint"
+            name="Mint"
+            stackId="mb"
+            radius={[2, 2, 0, 0]}
+            isAnimationActive={false}
+          >
+            {data.map((d) => (
+              <Cell key={d.date} fill="var(--color-pos)" />
+            ))}
+          </Bar>
+          <Bar
+            dataKey="burn"
+            name="Burn"
+            stackId="mb"
+            radius={[0, 0, 2, 2]}
+            isAnimationActive={false}
+          >
+            {data.map((d) => (
+              <Cell key={d.date} fill="var(--color-neg)" />
+            ))}
+          </Bar>
+          {yearly && (
+            <Brush
+              dataKey="label"
+              height={22}
+              stroke="var(--color-border-strong)"
+              fill="var(--color-bg-base)"
+              travellerWidth={8}
+              tickFormatter={() => ""}
+              y={310}
+            />
+          )}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-function AxisLabels({ dates, timeframe }: { dates: number[]; timeframe: Timeframe }) {
-  const maxLabels = 12;
-  const step = Math.max(1, Math.ceil(dates.length / maxLabels));
-  return (
-    <div className="flex justify-between font-mono text-[10px] text-[var(--color-text-muted)]">
-      {dates.map((d, i) => (
-        <span key={d} className="flex-1 text-center">
-          {i % step === 0 ? formatAxis(d, timeframe) : ""}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function formatAxis(dayId: number, timeframe: Timeframe): string {
-  const d = new Date(dayId * 86400 * 1000);
+function formatAxis(dateSecs: number, _timeframe: Timeframe): string {
+  if (!Number.isFinite(dateSecs)) return "—";
+  const d = new Date(dateSecs * 1000);
   if (Number.isNaN(d.getTime())) return "—";
-  if (timeframe === "yearly") {
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-  }
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+function CopyIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="5"
+        y="5"
+        width="8"
+        height="9"
+        rx="1"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <path
+        d="M3 11V3a1 1 0 0 1 1-1h7"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M9 2h5v5"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 2 7 9"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 10v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }

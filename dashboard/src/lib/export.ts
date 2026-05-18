@@ -11,17 +11,17 @@ const COLUMNS = [
   "Daily Burn Amount",
 ];
 
-function dayIdToISO(dayId: number, timeframe: Timeframe): string {
-  const d = new Date(dayId * 86400 * 1000);
-  if (timeframe === "yearly") {
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-  }
+function dateSecsToISO(secs: number): string {
+  const n = Number(secs);
+  if (!Number.isFinite(n)) return "";
+  const d = new Date(n * 1000);
+  if (Number.isNaN(d.getTime())) return "";
   return d.toISOString().slice(0, 10);
 }
 
-function buildRows(days: TokenDay[], timeframe: Timeframe) {
+function buildRows(days: TokenDay[]) {
   return days.map((d) => [
-    dayIdToISO(d.date, timeframe),
+    dateSecsToISO(d.date),
     d.dailyTransferAmount,
     d.dailyTransferCount,
     d.dailyMintAmount,
@@ -69,7 +69,7 @@ function exportCSV(token: Token, timeframe: Timeframe, days: TokenDay[]) {
   }
   lines.push("");
   lines.push(COLUMNS.map(escapeCSV).join(","));
-  for (const row of buildRows(days, timeframe)) {
+  for (const row of buildRows(days)) {
     lines.push(row.map(escapeCSV).join(","));
   }
   triggerDownload(
@@ -90,7 +90,7 @@ async function exportExcel(
     ...meta,
     [],
     COLUMNS,
-    ...buildRows(days, timeframe),
+    ...buildRows(days),
   ];
   const ws = XLSX.utils.aoa_to_sheet(sheetData);
   ws["!cols"] = [{ wch: 26 }, { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 20 }];
@@ -120,7 +120,7 @@ async function exportPDF(token: Token, timeframe: Timeframe, days: TokenDay[]) {
   autoTable(doc, {
     startY: y + 4,
     head: [COLUMNS],
-    body: buildRows(days, timeframe).map((r) =>
+    body: buildRows(days).map((r) =>
       r.map((c) => (typeof c === "number" ? c.toLocaleString() : c)),
     ),
     styles: { fontSize: 8, cellPadding: 2 },
