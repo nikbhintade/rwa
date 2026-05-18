@@ -1,7 +1,7 @@
 import type { Token, TokenStats, TokenDay } from "../types";
 
 export async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const res = await fetch("/graphql", {
+  const res = await fetch("/api/graphql", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),

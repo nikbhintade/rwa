@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     server: {
       proxy: {
-        '/graphql': {
+        '/api/graphql': {
           target: `${url.protocol}//${url.host}`,
           changeOrigin: true,
           secure: true,
