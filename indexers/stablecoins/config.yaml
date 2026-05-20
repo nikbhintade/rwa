@@ -218,6 +218,8 @@ chains:
         address: []
   - id: 4217 # Tempo
     start_block: 0
+    hypersync_config: 
+      url: https://tempo.hypersync.xyz/
     contracts:
       - name: Stablecoins
         address: [
@@ -293,11 +295,11 @@ chains:
         address: [
             "0xceba9300f2b948710d2653dd7b07f33a8b32118c", # USDC
           ]
-  - id: 42793 # Etherlink
-    start_block: 0
-    contracts:
-      - name: Stablecoins
-        address: []
+  # - id: 42793 # Etherlink
+  #   start_block: 0
+  #   contracts:
+  #     - name: Stablecoins
+  #       address: []
   - id: 43114 # Avalanche
     start_block: 0
     contracts:
@@ -355,11 +357,11 @@ chains:
     contracts:
       - name: Stablecoins
         address: []
-  - id: 747474 # Katana
-    start_block: 0
-    contracts:
-      - name: Stablecoins
-        address: []
+  # - id: 747474 # Katana
+  #   start_block: 0
+  #   contracts:
+  #     - name: Stablecoins
+  #       address: []
   - id: 1313161554 # Aurora
     start_block: 0
     contracts:
