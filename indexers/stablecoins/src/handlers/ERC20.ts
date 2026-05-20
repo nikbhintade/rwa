@@ -177,7 +177,7 @@ async function handleSupplyChange(
 }
 
 indexer.onEvent(
-  { contract: "ERC20", event: "Transfer" },
+  { contract: "Stablecoins", event: "Transfer" },
   async ({ event, context }) => {
     await handleTransfer(event, context);
   },
