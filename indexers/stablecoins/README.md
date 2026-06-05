@@ -1,4 +1,6 @@
-## Envio ERC20 Template
+## Stablecoins Indexer
+
+Multichain [Envio](https://envio.dev) HyperIndex that tracks ERC20 stablecoin transfers, mints, burns, and daily aggregates across Ethereum and other EVM chains.
 
 _Please refer to the [documentation website](https://docs.envio.dev) for a thorough guide on all [Envio](https://envio.dev) indexer features_
 
