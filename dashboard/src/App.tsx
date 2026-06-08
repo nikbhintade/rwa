@@ -1,20 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { TokenDetail } from "./components/TokenDetail";
 import { tokens } from "./data/tokens";
-import { fetchAllStats, fetchTokenDetail } from "./lib/gql";
+import {
+  assembleFromChainStats,
+  fetchAllStats,
+  fetchTokenDetail,
+  type ChainStatsMap,
+} from "./lib/gql";
 import type { Token, TokenStats } from "./types";
 
 function App() {
   const [selected, setSelected] = useState<Token | undefined>();
-  const [stats, setStats] = useState<Record<string, TokenStats>>({});
+  const [stats, setStats] = useState<ChainStatsMap>({});
   const [detailCache, setDetailCache] = useState<Record<string, TokenStats>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetchAllStats(tokens)
       .then((s) => {
         if (!cancelled) setStats(s);
@@ -32,12 +36,13 @@ function App() {
 
   useEffect(() => {
     if (!selected) return;
-    if (detailCache[selected.address]) return;
+    if (detailCache[selected.id]) return;
     let cancelled = false;
-    fetchTokenDetail(selected)
+    const token = selected;
+    fetchTokenDetail(token)
       .then((s) => {
         if (cancelled) return;
-        setDetailCache((c) => ({ ...c, [selected.address]: s }));
+        setDetailCache((c) => ({ ...c, [token.id]: s }));
       })
       .catch(() => {});
     return () => {
@@ -45,7 +50,12 @@ function App() {
     };
   }, [selected, detailCache]);
 
-  const handleSelect = useCallback((t: Token) => setSelected(t), []);
+  const handleSelect = useCallback((token: Token) => setSelected(token), []);
+
+  const fallbackStats = useMemo(
+    () => (selected ? assembleFromChainStats(selected, stats) : undefined),
+    [selected, stats],
+  );
 
   return (
     <div className="flex h-screen w-screen bg-[var(--color-bg-base)]">
@@ -59,8 +69,8 @@ function App() {
         {selected ? (
           <TokenDetail
             token={selected}
-            sidebarStats={stats[selected.address]}
-            detailStats={detailCache[selected.address]}
+            sidebarStats={fallbackStats}
+            detailStats={detailCache[selected.id]}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-[13px] text-[var(--color-text-muted)]">

@@ -4,16 +4,21 @@ import {
   BarChart,
   Brush,
   CartesianGrid,
-  Cell,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { Token, TokenDay, TokenStats } from "../types";
+import type { ChainSeries, Token, TokenDay, TokenStats } from "../types";
+import { chainById, tokenExplorerUrl } from "../data/chains";
 import { formatCompact } from "../lib/format";
-import { aggregateByTimeframe, type Timeframe } from "../lib/gql";
+import {
+  aggregateByTimeframe,
+  timeframeDates,
+  timeframeLen,
+  type Timeframe,
+} from "../lib/gql";
 import { exportData, type ExportFormat } from "../lib/export";
 
 type Tab = "count" | "volume" | "mintburn";
@@ -24,26 +29,58 @@ type Props = {
   detailStats?: TokenStats;
 };
 
+type ChainMeta = { chainId: number; name: string; color: string };
+
 export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
   const [tab, setTab] = useState<Tab>("volume");
   const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
   const [copied, setCopied] = useState(false);
+  // null = all chains; otherwise filter to a single chain.
+  const [chainFilter, setChainFilter] = useState<number | null>(null);
 
   const loading = !detailStats;
-  const supply = detailStats?.totalSupply ?? sidebarStats?.totalSupply ?? null;
+  const stats = detailStats ?? sidebarStats;
 
+  const fullByChain = useMemo(() => stats?.byChain ?? [], [stats]);
+
+  // Apply the chain filter: scope every metric to the selected chain (or all).
+  const byChain = useMemo(
+    () =>
+      chainFilter == null
+        ? fullByChain
+        : fullByChain.filter((s) => s.chainId === chainFilter),
+    [fullByChain, chainFilter],
+  );
   const allDays = useMemo(
-    () => detailStats?.days ?? sidebarStats?.days ?? [],
-    [detailStats, sidebarStats],
+    () => (chainFilter == null ? (stats?.days ?? []) : (byChain[0]?.days ?? [])),
+    [stats, chainFilter, byChain],
   );
-  const days = useMemo(
-    () => aggregateByTimeframe(allDays, timeframe),
-    [allDays, timeframe],
+  const supply = useMemo(() => {
+    if (chainFilter == null) return stats?.totalSupply ?? null;
+    return byChain[0]?.totalSupply ?? null;
+  }, [stats, chainFilter, byChain]);
+
+  const activeStats: TokenStats | undefined = useMemo(
+    () => (stats ? { totalSupply: supply, days: allDays, byChain } : undefined),
+    [stats, supply, allDays, byChain],
   );
-  const prevDays = useMemo(
-    () => prevPeriodDays(allDays, timeframe),
-    [allDays, timeframe],
+
+  const days = useMemo(() => aggregateByTimeframe(allDays, timeframe), [allDays, timeframe]);
+  const prevDays = useMemo(() => prevPeriodDays(allDays, timeframe), [allDays, timeframe]);
+
+  // Chains that actually carry data (already sorted by supply in fetchTokenDetail).
+  const chainMetas: ChainMeta[] = useMemo(
+    () =>
+      byChain.map((s) => {
+        const c = chainById(s.chainId);
+        return { chainId: s.chainId, name: c.name, color: c.color };
+      }),
+    [byChain],
   );
+
+  const windowDates = useMemo(() => timeframeDates(allDays, timeframe), [allDays, timeframe]);
+
+  const scopeLabel = chainFilter == null ? "all chains" : chainById(chainFilter).name;
 
   const totalTransfer = days.reduce((a, d) => a + d.dailyTransferAmount, 0);
   const totalCount = days.reduce((a, d) => a + d.dailyTransferCount, 0);
@@ -52,9 +89,9 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
   const transferDelta = pctDelta(totalTransfer, prevTransfer);
   const countDelta = pctDelta(totalCount, prevCount);
 
-  async function handleCopy() {
+  async function handleCopy(addr: string) {
     try {
-      await navigator.clipboard.writeText(token.address);
+      await navigator.clipboard.writeText(addr);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -64,50 +101,55 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 p-6">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--color-border-subtle)] pb-4">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-[24px] font-semibold leading-none text-[var(--color-text-primary)]">
-            {token.symbol}
-          </h2>
-          <span className="text-[13px] text-[var(--color-text-secondary)]">
-            {token.name}
+      <header className="flex flex-col gap-3 border-b border-[var(--color-border-subtle)] pb-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-[24px] font-semibold leading-none text-[var(--color-text-primary)]">
+              {token.symbol}
+            </h2>
+            <span className="text-[13px] text-[var(--color-text-secondary)]">
+              {token.name}
+            </span>
+          </div>
+          <span className="rounded-sm border border-[var(--color-border-subtle)] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
+            {token.chains.length} {token.chains.length === 1 ? "chain" : "chains"}
           </span>
-        </div>
-        <div className="flex items-center gap-1.5 rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2 py-1">
-          <span className="font-mono text-[10.5px] text-[var(--color-text-tertiary)]">
-            {shortAddr(token.address)}
-          </span>
-          <button
-            onClick={handleCopy}
-            title="Copy address"
-            className="text-[var(--color-text-muted)] transition hover:text-[var(--color-text-primary)]"
-          >
-            <CopyIcon />
-          </button>
-          <a
-            href={`https://etherscan.io/token/${token.address}`}
-            target="_blank"
-            rel="noreferrer"
-            title="View on Etherscan"
-            className="text-[var(--color-text-muted)] transition hover:text-[var(--color-text-primary)]"
-          >
-            <ExternalIcon />
-          </a>
-        </div>
-        {copied && (
-          <span className="text-[10px] uppercase tracking-wider text-[var(--color-pos)]">
-            Copied
-          </span>
-        )}
-        <span className="rounded-sm border border-[var(--color-border-subtle)] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">
-          Ethereum
-        </span>
-        <div className="ml-auto flex items-center gap-3">
-          {loading && (
-            <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
-              Loading…
+          {copied && (
+            <span className="text-[10px] uppercase tracking-wider text-[var(--color-pos)]">
+              Copied
             </span>
           )}
+          <div className="ml-auto flex items-center gap-3">
+            {loading && (
+              <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+                Loading…
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setChainFilter(null)}
+            className={`rounded-md border px-2.5 py-1 text-[10.5px] font-medium transition ${
+              chainFilter == null
+                ? "border-[var(--color-accent)] bg-[var(--color-accent-bg)] text-[var(--color-text-primary)]"
+                : "border-[var(--color-border-default)] bg-[var(--color-bg-surface)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
+            }`}
+          >
+            All chains
+          </button>
+          {token.chains.map((c) => (
+            <ChainChip
+              key={`${c.chainId}:${c.address}`}
+              chainId={c.chainId}
+              address={c.address}
+              active={c.chainId === chainFilter}
+              onToggle={() =>
+                setChainFilter((cur) => (cur === c.chainId ? null : c.chainId))
+              }
+              onCopy={() => handleCopy(c.address)}
+            />
+          ))}
         </div>
       </header>
 
@@ -136,38 +178,52 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
           <DownloadMenu
             token={token}
             timeframe={timeframe}
-            days={days}
-            disabled={days.length === 0}
+            stats={activeStats}
+            disabled={!activeStats || windowDates.length === 0}
           />
         </div>
 
         <Tabs value={tab} onChange={setTab} />
 
+        {chainMetas.length > 0 && <ChainLegend chains={chainMetas} />}
+
         <div className="w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
-          {days.length === 0 ? (
+          {windowDates.length === 0 ? (
             <div className="py-12 text-center text-[12px] text-[var(--color-text-muted)]">
               {loading ? "Loading…" : "No data"}
             </div>
           ) : tab === "count" ? (
-            <SeriesChart
-              days={days}
+            <StackedSeriesChart
+              byChain={byChain}
+              chains={chainMetas}
+              windowDates={windowDates}
               timeframe={timeframe}
+              scopeLabel={scopeLabel}
               valueKey="dailyTransferCount"
               format={(v) => v.toLocaleString()}
               label="Transfers"
-              color="var(--color-accent)"
+              isCount
             />
           ) : tab === "volume" ? (
-            <SeriesChart
-              days={days}
+            <StackedSeriesChart
+              byChain={byChain}
+              chains={chainMetas}
+              windowDates={windowDates}
               timeframe={timeframe}
+              scopeLabel={scopeLabel}
               valueKey="dailyTransferAmount"
               format={(v) => `${formatCompact(v)} ${token.symbol}`}
               label="Volume"
-              color="var(--color-accent)"
             />
           ) : (
-            <MintBurnChart days={days} symbol={token.symbol} timeframe={timeframe} />
+            <StackedMintBurnChart
+              byChain={byChain}
+              chains={chainMetas}
+              windowDates={windowDates}
+              timeframe={timeframe}
+              scopeLabel={scopeLabel}
+              symbol={token.symbol}
+            />
           )}
         </div>
       </section>
@@ -181,7 +237,7 @@ function tfLabel(t: Timeframe): string {
 
 function prevPeriodDays(all: TokenDay[], t: Timeframe): TokenDay[] {
   const sorted = [...all].sort((a, b) => a.date - b.date);
-  const len = t === "weekly" ? 7 : t === "monthly" ? 30 : 365;
+  const len = timeframeLen(t);
   const end = sorted.length - len;
   if (end <= 0) return [];
   const start = Math.max(0, end - len);
@@ -196,6 +252,91 @@ function pctDelta(curr: number, prev: number): number | null {
 
 function shortAddr(a: string): string {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function ChainChip({
+  chainId,
+  address,
+  active,
+  onToggle,
+  onCopy,
+}: {
+  chainId: number;
+  address: string;
+  active: boolean;
+  onToggle: () => void;
+  onCopy: () => void;
+}) {
+  const chain = chainById(chainId);
+  const url = tokenExplorerUrl(chainId, address);
+  return (
+    <span
+      className={`flex items-center gap-1.5 rounded-md border px-2 py-1 transition ${
+        active
+          ? "border-[var(--color-accent)] bg-[var(--color-accent-bg)]"
+          : "border-[var(--color-border-default)] bg-[var(--color-bg-surface)]"
+      }`}
+    >
+      <button
+        onClick={onToggle}
+        title={active ? `Showing ${chain.name} only — click to clear` : `Filter to ${chain.name}`}
+        className="flex items-center gap-1.5"
+      >
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ background: chain.color }}
+          aria-hidden="true"
+        />
+        <span
+          className={`text-[10.5px] font-medium ${
+            active ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"
+          }`}
+        >
+          {chain.name}
+        </span>
+        <span className="font-mono text-[10px] text-[var(--color-text-tertiary)]">
+          {shortAddr(address)}
+        </span>
+      </button>
+      <button
+        onClick={onCopy}
+        title="Copy address"
+        className="text-[var(--color-text-muted)] transition hover:text-[var(--color-text-primary)]"
+      >
+        <CopyIcon />
+      </button>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          title={`View on ${chain.name} explorer`}
+          className="text-[var(--color-text-muted)] transition hover:text-[var(--color-text-primary)]"
+        >
+          <ExternalIcon />
+        </a>
+      )}
+    </span>
+  );
+}
+
+function ChainLegend({ chains }: { chains: ChainMeta[] }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+      {chains.map((c) => (
+        <span key={c.chainId} className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 rounded-[2px]"
+            style={{ background: c.color }}
+            aria-hidden="true"
+          />
+          <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-tertiary)]">
+            {c.name}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function TimeframeToggle({
@@ -235,12 +376,12 @@ function TimeframeToggle({
 function DownloadMenu({
   token,
   timeframe,
-  days,
+  stats,
   disabled,
 }: {
   token: Token;
   timeframe: Timeframe;
-  days: TokenDay[];
+  stats?: TokenStats;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -252,7 +393,7 @@ function DownloadMenu({
   ];
   function handle(f: ExportFormat) {
     setOpen(false);
-    void exportData(token, timeframe, days, f);
+    if (stats) void exportData(token, timeframe, stats, f);
   }
   return (
     <div className="relative">
@@ -326,9 +467,7 @@ function StatBox({
         <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
           {label}
         </div>
-        {delta != null && Number.isFinite(delta) && (
-          <DeltaPill value={delta} />
-        )}
+        {delta != null && Number.isFinite(delta) && <DeltaPill value={delta} />}
       </div>
       <div className="mt-2 font-mono text-[22px] font-medium leading-none tabular-nums text-[var(--color-text-primary)]">
         {value == null ? (
@@ -362,43 +501,72 @@ function DeltaPill({ value }: { value: number }) {
   );
 }
 
-type ChartDatum = {
-  date: number;
-  value: number;
-  label: string;
-};
+/** chainId -> (date -> TokenDay) for O(1) lookup while building chart rows. */
+function buildLookup(byChain: ChainSeries[]): Map<number, Map<number, TokenDay>> {
+  const m = new Map<number, Map<number, TokenDay>>();
+  for (const s of byChain) {
+    const inner = new Map<number, TokenDay>();
+    for (const d of s.days) inner.set(d.date, d);
+    m.set(s.chainId, inner);
+  }
+  return m;
+}
 
-function SeriesChart({
-  days,
+const TOOLTIP_STYLE = {
+  background: "var(--color-bg-elevated)",
+  border: "1px solid var(--color-border-default)",
+  borderRadius: 6,
+  fontSize: 11,
+  fontFamily: "var(--font-mono)",
+  padding: "6px 10px",
+} as const;
+
+type StackRow = { date: number; label: string } & Record<string, number | string>;
+
+function StackedSeriesChart({
+  byChain,
+  chains,
+  windowDates,
   timeframe,
+  scopeLabel,
   valueKey,
   format,
   label,
-  color,
+  isCount,
 }: {
-  days: TokenDay[];
+  byChain: ChainSeries[];
+  chains: ChainMeta[];
+  windowDates: number[];
   timeframe: Timeframe;
+  scopeLabel: string;
   valueKey: "dailyTransferAmount" | "dailyTransferCount";
   format: (v: number) => string;
   label: string;
-  color: string;
+  isCount?: boolean;
 }) {
-  const data: ChartDatum[] = days.map((d) => ({
-    date: d.date,
-    value: Number.isFinite(d[valueKey]) ? d[valueKey] : 0,
-    label: formatAxis(d.date, timeframe),
-  }));
+  const lookup = useMemo(() => buildLookup(byChain), [byChain]);
+  const data: StackRow[] = windowDates.map((date) => {
+    const row: StackRow = { date, label: formatAxis(date) };
+    for (const c of chains) {
+      const v = lookup.get(c.chainId)?.get(date)?.[valueKey];
+      row[`c${c.chainId}`] = Number.isFinite(v) ? (v as number) : 0;
+    }
+    return row;
+  });
   const yearly = timeframe === "yearly";
-  const max = Math.max(...data.map((d) => d.value), 0);
+  const max = Math.max(
+    ...data.map((r) => chains.reduce((a, c) => a + (r[`c${c.chainId}`] as number), 0)),
+    0,
+  );
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
-          {label} · {tfLabel(timeframe)}
+          {label} · {tfLabel(timeframe)} · {scopeLabel}
         </span>
         <span className="font-mono text-[10px] text-[var(--color-text-muted)]">
-          max {format(max)}
+          peak {format(max)}
         </span>
       </div>
       <ResponsiveContainer width="100%" height={yearly ? 320 : 260}>
@@ -407,12 +575,6 @@ function SeriesChart({
           margin={{ top: 8, right: 8, left: 8, bottom: yearly ? 28 : 8 }}
           barCategoryGap={yearly ? "5%" : "20%"}
         >
-          <defs>
-            <linearGradient id="barFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.95} />
-              <stop offset="100%" stopColor={color} stopOpacity={0.55} />
-            </linearGradient>
-          </defs>
           <CartesianGrid
             strokeDasharray="2 4"
             stroke="var(--color-border-subtle)"
@@ -433,38 +595,26 @@ function SeriesChart({
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) =>
-              valueKey === "dailyTransferCount"
-                ? Number(v).toLocaleString()
-                : formatCompact(Number(v))
+              isCount ? Number(v).toLocaleString() : formatCompact(Number(v))
             }
             width={56}
           />
           <Tooltip
             cursor={{ fill: "var(--color-bg-hover)", opacity: 0.6 }}
-            contentStyle={{
-              background: "var(--color-bg-elevated)",
-              border: "1px solid var(--color-border-default)",
-              borderRadius: 6,
-              fontSize: 11,
-              fontFamily: "var(--font-mono)",
-              padding: "6px 10px",
-            }}
-            labelStyle={{
-              color: "var(--color-text-tertiary)",
-              fontSize: 10,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              marginBottom: 2,
-            }}
-            itemStyle={{ color: "var(--color-text-primary)" }}
-            formatter={(v) => [format(Number(v)), label] as [string, string]}
+            contentStyle={TOOLTIP_STYLE}
+            content={<StackTooltip chains={chains} format={format} />}
           />
-          <Bar
-            dataKey="value"
-            fill="url(#barFill)"
-            radius={[2, 2, 0, 0]}
-            isAnimationActive={false}
-          />
+          {chains.map((c, i) => (
+            <Bar
+              key={c.chainId}
+              dataKey={`c${c.chainId}`}
+              name={c.name}
+              stackId="s"
+              fill={c.color}
+              isAnimationActive={false}
+              radius={i === chains.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]}
+            />
+          ))}
           {yearly && (
             <Brush
               dataKey="label"
@@ -482,38 +632,46 @@ function SeriesChart({
   );
 }
 
-type MintBurnDatum = {
-  date: number;
-  label: string;
-  mint: number;
-  burn: number;
-};
-
-function MintBurnChart({
-  days,
-  symbol,
+function StackedMintBurnChart({
+  byChain,
+  chains,
+  windowDates,
   timeframe,
+  scopeLabel,
+  symbol,
 }: {
-  days: TokenDay[];
-  symbol: string;
+  byChain: ChainSeries[];
+  chains: ChainMeta[];
+  windowDates: number[];
   timeframe: Timeframe;
+  scopeLabel: string;
+  symbol: string;
 }) {
-  const safe = (v: number) => (Number.isFinite(v) ? v : 0);
-  const data: MintBurnDatum[] = days.map((d) => ({
-    date: d.date,
-    label: formatAxis(d.date, timeframe),
-    mint: safe(d.dailyMintAmount),
-    burn: -safe(d.dailyBurnAmount),
-  }));
-  const totalMint = data.reduce((a, d) => a + d.mint, 0);
-  const totalBurn = -data.reduce((a, d) => a + d.burn, 0);
+  const lookup = useMemo(() => buildLookup(byChain), [byChain]);
+  const data: StackRow[] = windowDates.map((date) => {
+    const row: StackRow = { date, label: formatAxis(date) };
+    for (const c of chains) {
+      const d = lookup.get(c.chainId)?.get(date);
+      row[`m${c.chainId}`] = d ? safe(d.dailyMintAmount) : 0;
+      row[`b${c.chainId}`] = d ? -safe(d.dailyBurnAmount) : 0;
+    }
+    return row;
+  });
+  const totalMint = data.reduce(
+    (a, r) => a + chains.reduce((s, c) => s + (r[`m${c.chainId}`] as number), 0),
+    0,
+  );
+  const totalBurn = -data.reduce(
+    (a, r) => a + chains.reduce((s, c) => s + (r[`b${c.chainId}`] as number), 0),
+    0,
+  );
   const yearly = timeframe === "yearly";
 
   if (totalMint === 0 && totalBurn === 0) {
     return (
       <div className="flex flex-col gap-2">
         <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
-          Mint / Burn · {tfLabel(timeframe)}
+          Mint / Burn · {tfLabel(timeframe)} · {scopeLabel}
         </div>
         <div className="py-8 text-center text-[12px] text-[var(--color-text-muted)]">
           No mint or burn activity in this period
@@ -526,18 +684,17 @@ function MintBurnChart({
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
-          Mint / Burn · {tfLabel(timeframe)}
+          Mint / Burn · {tfLabel(timeframe)} · {scopeLabel}
         </span>
         <span className="font-mono text-[10px]">
-          <span className="text-[var(--color-pos)]">
-            +{formatCompact(totalMint)}
-          </span>
+          <span className="text-[var(--color-pos)]">+{formatCompact(totalMint)}</span>
           <span className="text-[var(--color-text-muted)]"> / </span>
-          <span className="text-[var(--color-neg)]">
-            -{formatCompact(totalBurn)}
-          </span>
+          <span className="text-[var(--color-neg)]">-{formatCompact(totalBurn)}</span>
           <span className="ml-1 text-[var(--color-text-tertiary)]">{symbol}</span>
         </span>
+      </div>
+      <div className="text-[9px] text-[var(--color-text-muted)]">
+        Bars above zero = mint, below zero = burn · color = chain
       </div>
       <ResponsiveContainer width="100%" height={yearly ? 340 : 280}>
         <BarChart
@@ -571,50 +728,30 @@ function MintBurnChart({
           <ReferenceLine y={0} stroke="var(--color-border-default)" />
           <Tooltip
             cursor={{ fill: "var(--color-bg-hover)", opacity: 0.6 }}
-            contentStyle={{
-              background: "var(--color-bg-elevated)",
-              border: "1px solid var(--color-border-default)",
-              borderRadius: 6,
-              fontSize: 11,
-              fontFamily: "var(--font-mono)",
-              padding: "6px 10px",
-            }}
-            labelStyle={{
-              color: "var(--color-text-tertiary)",
-              fontSize: 10,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              marginBottom: 2,
-            }}
-            itemStyle={{ color: "var(--color-text-primary)" }}
-            formatter={(v, name) => {
-              const abs = Math.abs(Number(v));
-              const sign = name === "Burn" ? "-" : "+";
-              return [`${sign}${formatCompact(abs)} ${symbol}`, String(name)] as [string, string];
-            }}
+            contentStyle={TOOLTIP_STYLE}
+            content={<MintBurnTooltip chains={chains} symbol={symbol} />}
           />
-          <Bar
-            dataKey="mint"
-            name="Mint"
-            stackId="mb"
-            radius={[2, 2, 0, 0]}
-            isAnimationActive={false}
-          >
-            {data.map((d) => (
-              <Cell key={d.date} fill="var(--color-pos)" />
-            ))}
-          </Bar>
-          <Bar
-            dataKey="burn"
-            name="Burn"
-            stackId="mb"
-            radius={[0, 0, 2, 2]}
-            isAnimationActive={false}
-          >
-            {data.map((d) => (
-              <Cell key={d.date} fill="var(--color-neg)" />
-            ))}
-          </Bar>
+          {chains.map((c) => (
+            <Bar
+              key={`m${c.chainId}`}
+              dataKey={`m${c.chainId}`}
+              name={`${c.name} mint`}
+              stackId="mb"
+              fill={c.color}
+              isAnimationActive={false}
+            />
+          ))}
+          {chains.map((c) => (
+            <Bar
+              key={`b${c.chainId}`}
+              dataKey={`b${c.chainId}`}
+              name={`${c.name} burn`}
+              stackId="mb"
+              fill={c.color}
+              fillOpacity={0.5}
+              isAnimationActive={false}
+            />
+          ))}
           {yearly && (
             <Brush
               dataKey="label"
@@ -632,7 +769,88 @@ function MintBurnChart({
   );
 }
 
-function formatAxis(dateSecs: number, _timeframe: Timeframe): string {
+type TooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: { dataKey?: string | number; value?: number }[];
+};
+
+function StackTooltip({
+  active,
+  label,
+  payload,
+  chains,
+  format,
+}: TooltipProps & { chains: ChainMeta[]; format: (v: number) => string }) {
+  if (!active || !payload?.length) return null;
+  const rows = chains
+    .map((c) => ({
+      c,
+      v: Number(payload.find((p) => p.dataKey === `c${c.chainId}`)?.value ?? 0),
+    }))
+    .filter((r) => r.v !== 0);
+  const total = rows.reduce((a, r) => a + r.v, 0);
+  return (
+    <div style={TOOLTIP_STYLE}>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)]">
+        {label}
+      </div>
+      {rows.map((r) => (
+        <div key={r.c.chainId} className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-[2px]" style={{ background: r.c.color }} />
+          <span className="text-[var(--color-text-secondary)]">{r.c.name}</span>
+          <span className="ml-auto pl-3 text-[var(--color-text-primary)]">{format(r.v)}</span>
+        </div>
+      ))}
+      <div className="mt-1 flex items-center gap-1.5 border-t border-[var(--color-border-subtle)] pt-1">
+        <span className="text-[var(--color-text-tertiary)]">Total</span>
+        <span className="ml-auto pl-3 text-[var(--color-text-primary)]">{format(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+function MintBurnTooltip({
+  active,
+  label,
+  payload,
+  chains,
+  symbol,
+}: TooltipProps & { chains: ChainMeta[]; symbol: string }) {
+  if (!active || !payload?.length) return null;
+  const rows = chains
+    .map((c) => ({
+      c,
+      mint: Number(payload.find((p) => p.dataKey === `m${c.chainId}`)?.value ?? 0),
+      burn: -Number(payload.find((p) => p.dataKey === `b${c.chainId}`)?.value ?? 0),
+    }))
+    .filter((r) => r.mint !== 0 || r.burn !== 0);
+  return (
+    <div style={TOOLTIP_STYLE}>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)]">
+        {label}
+      </div>
+      {rows.map((r) => (
+        <div key={r.c.chainId} className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-[2px]" style={{ background: r.c.color }} />
+          <span className="text-[var(--color-text-secondary)]">{r.c.name}</span>
+          <span className="ml-auto pl-3">
+            <span className="text-[var(--color-pos)]">+{formatCompact(r.mint)}</span>
+            <span className="text-[var(--color-text-muted)]"> / </span>
+            <span className="text-[var(--color-neg)]">-{formatCompact(r.burn)}</span>
+          </span>
+        </div>
+      ))}
+      <div className="mt-1 text-[9px] text-[var(--color-text-muted)]">{symbol}</div>
+    </div>
+  );
+}
+
+function safe(v: number): number {
+  return Number.isFinite(v) ? v : 0;
+}
+
+function formatAxis(dateSecs: number): string {
   if (!Number.isFinite(dateSecs)) return "—";
   const d = new Date(dateSecs * 1000);
   if (Number.isNaN(d.getTime())) return "—";
@@ -656,22 +874,8 @@ const MONTHS = [
 
 function CopyIcon() {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect
-        x="5"
-        y="5"
-        width="8"
-        height="9"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.3"
-      />
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="5" y="5" width="8" height="9" rx="1" stroke="currentColor" strokeWidth="1.3" />
       <path
         d="M3 11V3a1 1 0 0 1 1-1h7"
         stroke="currentColor"
@@ -684,25 +888,9 @@ function CopyIcon() {
 
 function ExternalIcon() {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M9 2h5v5"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M14 2 7 9"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M9 2h5v5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M14 2 7 9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       <path
         d="M12 10v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3"
         stroke="currentColor"
