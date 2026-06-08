@@ -20,23 +20,32 @@ import {
   type Timeframe,
 } from "../lib/gql";
 import { exportData, type ExportFormat } from "../lib/export";
+import { shareUrl } from "../lib/router";
 
 type Tab = "count" | "volume" | "mintburn";
 
 type Props = {
   token: Token;
+  // null = all chains; otherwise scope to a single chain (controlled, URL-synced).
+  chainFilter: number | null;
+  onChainFilter: (chainId: number | null) => void;
   sidebarStats?: TokenStats;
   detailStats?: TokenStats;
 };
 
 type ChainMeta = { chainId: number; name: string; color: string };
 
-export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
+export function TokenDetail({
+  token,
+  chainFilter,
+  onChainFilter,
+  sidebarStats,
+  detailStats,
+}: Props) {
   const [tab, setTab] = useState<Tab>("volume");
   const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
   const [copied, setCopied] = useState(false);
-  // null = all chains; otherwise filter to a single chain.
-  const [chainFilter, setChainFilter] = useState<number | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const loading = !detailStats;
   const stats = detailStats ?? sidebarStats;
@@ -99,6 +108,17 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
     }
   }
 
+  async function handleShare() {
+    const url = shareUrl(token.id, chainFilter);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      /* ignore — clipboard may be unavailable */
+    }
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  }
+
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5 p-6">
       <header className="flex flex-col gap-3 border-b border-[var(--color-border-subtle)] pb-4">
@@ -125,11 +145,19 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
                 Loading…
               </span>
             )}
+            <button
+              onClick={handleShare}
+              title="Copy shareable link"
+              className="flex items-center gap-1.5 rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-primary)] transition hover:bg-[var(--color-bg-hover)]"
+            >
+              <ShareIcon />
+              {linkCopied ? "Link copied" : "Share"}
+            </button>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
-            onClick={() => setChainFilter(null)}
+            onClick={() => onChainFilter(null)}
             className={`rounded-md border px-2.5 py-1 text-[10.5px] font-medium transition ${
               chainFilter == null
                 ? "border-[var(--color-accent)] bg-[var(--color-accent-bg)] text-[var(--color-text-primary)]"
@@ -144,9 +172,7 @@ export function TokenDetail({ token, sidebarStats, detailStats }: Props) {
               chainId={c.chainId}
               address={c.address}
               active={c.chainId === chainFilter}
-              onToggle={() =>
-                setChainFilter((cur) => (cur === c.chainId ? null : c.chainId))
-              }
+              onToggle={() => onChainFilter(c.chainId === chainFilter ? null : c.chainId)}
               onCopy={() => handleCopy(c.address)}
             />
           ))}
@@ -878,6 +904,22 @@ function CopyIcon() {
       <rect x="5" y="5" width="8" height="9" rx="1" stroke="currentColor" strokeWidth="1.3" />
       <path
         d="M3 11V3a1 1 0 0 1 1-1h7"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="12" cy="3.5" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="4" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="12" cy="12.5" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="M10.4 4.5 5.6 7M5.6 9l4.8 2.5"
         stroke="currentColor"
         strokeWidth="1.3"
         strokeLinecap="round"
