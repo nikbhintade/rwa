@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { tokens } from "../data/tokens";
+import { chainById } from "../data/chains";
 import type { Token, TokenStats } from "../types";
+import { assembleFromChainStats, type ChainStatsMap } from "../lib/gql";
 import { formatCompact } from "../lib/format";
 import { Sparkline } from "./Sparkline";
 
@@ -10,12 +12,11 @@ type SortDir = "asc" | "desc";
 type Props = {
   selectedId?: string;
   onSelect?: (token: Token) => void;
-  stats: Record<string, TokenStats>;
+  stats: ChainStatsMap;
   loading: boolean;
 };
 
-function transferSum(s?: TokenStats): number {
-  if (!s) return 0;
+function transferSum(s: TokenStats): number {
   return s.days.reduce((a, d) => a + d.dailyTransferAmount, 0);
 }
 
@@ -23,6 +24,12 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("supply");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // Aggregate each logical token across its chains from the per-chain map.
+  const aggregated = useMemo(
+    () => new Map(tokens.map((t) => [t.id, assembleFromChainStats(t, stats)])),
+    [stats],
+  );
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -35,14 +42,14 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
       : tokens;
 
     const sorted = [...filtered].sort((a, b) => {
-      const sa = stats[a.address];
-      const sb = stats[b.address];
-      const va = sortKey === "supply" ? (sa?.totalSupply ?? 0) : transferSum(sa);
-      const vb = sortKey === "supply" ? (sb?.totalSupply ?? 0) : transferSum(sb);
+      const sa = aggregated.get(a.id)!;
+      const sb = aggregated.get(b.id)!;
+      const va = sortKey === "supply" ? (sa.totalSupply ?? 0) : transferSum(sa);
+      const vb = sortKey === "supply" ? (sb.totalSupply ?? 0) : transferSum(sb);
       return sortDir === "asc" ? va - vb : vb - va;
     });
     return sorted;
-  }, [query, sortKey, sortDir, stats]);
+  }, [query, sortKey, sortDir, aggregated]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -54,7 +61,7 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
   }
 
   return (
-    <aside className="flex h-full w-[20%] min-w-[300px] flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
+    <aside className="flex h-full w-[20%] min-w-[320px] flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)]">
       <header className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3.5">
         <div className="h-2 w-2 rounded-full bg-[var(--color-accent)] shadow-[0_0_10px_var(--color-accent)]" />
         <h1 className="text-[12.5px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-primary)]">
@@ -107,7 +114,7 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
             <Row
               key={t.id}
               token={t}
-              stats={stats[t.address]}
+              stats={aggregated.get(t.id)!}
               selected={t.id === selectedId}
               onClick={() => onSelect?.(t)}
             />
@@ -119,7 +126,7 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
         <span>
           {rows.length} of {tokens.length} tokens
         </span>
-        <span className="font-mono">v1.0</span>
+        <span className="font-mono">v2.0</span>
       </footer>
     </aside>
   );
@@ -132,14 +139,15 @@ function Row({
   onClick,
 }: {
   token: Token;
-  stats?: TokenStats;
+  stats: TokenStats;
   selected: boolean;
   onClick: () => void;
 }) {
-  const series = stats?.days.map((d) => d.dailyTransferAmount) ?? [];
-  const sum = stats ? transferSum(stats) : null;
-  const supply = stats?.totalSupply ?? null;
+  const series = stats.days.map((d) => d.dailyTransferAmount);
+  const sum = transferSum(stats);
+  const supply = stats.totalSupply;
   const positive = series.length >= 2 ? series[series.length - 1] >= series[0] : true;
+  const chainColors = token.chains.slice(0, 5).map((c) => chainById(c.chainId).color);
 
   return (
     <button
@@ -155,14 +163,26 @@ function Row({
         <div className="truncate text-[12.5px] font-semibold leading-tight text-[var(--color-text-primary)]">
           {token.symbol}
         </div>
-        <div className="truncate text-[10.5px] leading-tight text-[var(--color-text-tertiary)]">
-          {token.name}
+        <div className="mt-1 flex items-center gap-1.5">
+          <span className="flex items-center gap-0.5">
+            {chainColors.map((color, i) => (
+              <span
+                key={i}
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: color }}
+                aria-hidden="true"
+              />
+            ))}
+          </span>
+          <span className="truncate text-[10px] leading-tight text-[var(--color-text-tertiary)]">
+            {token.chains.length} {token.chains.length === 1 ? "chain" : "chains"}
+          </span>
         </div>
       </div>
 
       <div className="flex flex-col items-end gap-1">
         <span className="font-mono text-[11px] leading-none tabular-nums text-[var(--color-text-secondary)]">
-          {sum != null ? formatCompact(sum) : "—"}
+          {series.length ? formatCompact(sum) : "—"}
         </span>
         <div className="h-[18px]">
           {series.length >= 2 && (
