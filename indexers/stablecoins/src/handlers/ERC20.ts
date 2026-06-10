@@ -176,13 +176,12 @@ async function handleSupplyChange(
   });
 }
 
-// Stablecoins contracts are currently disabled in config.yaml.
-// indexer.onEvent(
-//   { contract: "Stablecoins", event: "Transfer" },
-//   async ({ event, context }) => {
-//     await handleTransfer(event, context);
-//   },
-// );
+indexer.onEvent(
+  { contract: "Stablecoins", event: "Transfer" },
+  async ({ event, context }) => {
+    await handleTransfer(event, context);
+  },
+);
 
 // Ethereum mainnet USDT. issue/redeem do NOT emit Transfer, so supply is
 // adjusted from the custom Issue/Redeem events; normal transfers come through

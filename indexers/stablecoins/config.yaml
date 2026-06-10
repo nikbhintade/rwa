@@ -2,9 +2,9 @@
 name: erc20-indexer
 description: ERC-20 Indexer
 contracts:
-  # - name: Stablecoins
-  #   events:
-  #     - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+  - name: Stablecoins
+    events:
+      - event: "Transfer(address indexed from, address indexed to, uint256 value)"
   # Ethereum mainnet USDT: issue/redeem do NOT emit Transfer, so supply is
   # tracked via the custom Issue/Redeem events.
   - name: USDT
@@ -27,21 +27,21 @@ chains:
         address: [
           "0xdac17f958d2ee523a2206206994597c13d831ec7", # USDT
         ]
-      # - name: Stablecoins
-      #   address: [
-      #       "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
-      #       "0xdc035d45d973e3ec169d2276ddab16f1e407384f", # USDS
-      #       "0x4c9edd5852cd905f086c759e8383e09bff1e68b3", # Ethena USDe
-      #       "0x6b175474e89094c44da98b954eedeac495271d0f", # DAI
-      #       "0x6c3ea9036406852006290770bedfcaba0e23a0e8", # Paypal USD
-      #       "0x8d0d000ee44948fc98c9b98a4fa4921476f08b0d", # USD1
-      #       "0xfa2b947eec368f42195f24f36d2af29f7c24cec2", # Falcon USD USDf
-      #       "0x8292bb45bf1ee4d140127049757c2e0ff06317ed", # Ripple USD
-      #       "0xc139190f447e929f090edeb554d95abb8b18ac1c", # USDtb
-      #       "0x40d16fc0246ad3160ccc09b8d0d3a2cd28ae6c2f", # GHO
-      #       "0x73a15fed60bf67631dc6cd7bc5b6e8da8190acf5", # Usual USD
-      #       "0xe343167631d89b6ffc58b88d6b7fb0228795491d", # Global Dollar
-      #     ]
+      - name: Stablecoins
+        address: [
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
+            "0xdc035d45d973e3ec169d2276ddab16f1e407384f", # USDS
+            "0x4c9edd5852cd905f086c759e8383e09bff1e68b3", # Ethena USDe
+            "0x6b175474e89094c44da98b954eedeac495271d0f", # DAI
+            "0x6c3ea9036406852006290770bedfcaba0e23a0e8", # Paypal USD
+            "0x8d0d000ee44948fc98c9b98a4fa4921476f08b0d", # USD1
+            "0xfa2b947eec368f42195f24f36d2af29f7c24cec2", # Falcon USD USDf
+            "0x8292bb45bf1ee4d140127049757c2e0ff06317ed", # Ripple USD
+            "0xc139190f447e929f090edeb554d95abb8b18ac1c", # USDtb
+            "0x40d16fc0246ad3160ccc09b8d0d3a2cd28ae6c2f", # GHO
+            "0x73a15fed60bf67631dc6cd7bc5b6e8da8190acf5", # Usual USD
+            "0xe343167631d89b6ffc58b88d6b7fb0228795491d", # Global Dollar
+          ]
   - id: 10 # Optimism
     start_block: 0
     contracts:
@@ -49,11 +49,11 @@ chains:
         address: [
           "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0x0b2c639c533813f4aa9d7837caf62653d097ff85", # USDC
-  #           "0x7f5c764cbc14f9669b88837ca1490cca17c31607", # USDC.e
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0x0b2c639c533813f4aa9d7837caf62653d097ff85", # USDC
+            "0x7f5c764cbc14f9669b88837ca1490cca17c31607", # USDC.e
+          ]
   # - id: 14 # Flare
     # start_block: 0
     # contracts:
@@ -69,13 +69,13 @@ chains:
     # contracts:
     #   - name: Stablecoins
     #     address: []
-  # - id: 50 # XDC
-  #   start_block: 0
-  #   contracts:
-  #     - name: Stablecoins
-  #       address: [
-  #           "0xfa2958cb79b0491cc627c1557f441ef849ca8eb1", # USDC
-  #         ]
+  - id: 50 # XDC
+    start_block: 0
+    contracts:
+      - name: Stablecoins
+        address: [
+            "0xfa2958cb79b0491cc627c1557f441ef849ca8eb1", # USDC
+          ]
   - id: 56 # BSC
     start_block: 0
     contracts:
@@ -83,12 +83,12 @@ chains:
         address: [
           "0x55d398326f99059ff775485246999027b3197955", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", # USDC
-  #           "0x8d0d000ee44948fc98c9b98a4fa4921476f08b0d", # USD1
-  #           "0xb3b02e4a9fb2bd28cc2ff97b0ab3f6b3ec1ee9d2", # Falcon USD USDf
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", # USDC
+            "0x8d0d000ee44948fc98c9b98a4fa4921476f08b0d", # USD1
+            "0xb3b02e4a9fb2bd28cc2ff97b0ab3f6b3ec1ee9d2", # Falcon USD USDf
+          ]
   # - id: 100 # Gnosis
   #   start_block: 0
   #   contracts:
@@ -106,12 +106,12 @@ chains:
         address: [
           "0xc2132d05d31c914a87c6611c10748aeb04b58e8f", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0x2791bca1f2de4661ed88a30c99a7a9449aa84174", # USDC.e
-  #           "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359", # USDC
-  #           "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063", # DAI
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0x2791bca1f2de4661ed88a30c99a7a9449aa84174", # USDC.e
+            "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359", # USDC
+            "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063", # DAI
+          ]
   # - id: 143 # Monad
   #   start_block: 0
   #   contracts:
@@ -157,13 +157,13 @@ chains:
     # contracts:
     #   - name: Stablecoins
     #     address: []
-  # - id: 324 # ZKsync
-  #   start_block: 0
-  #   contracts:
-  #     - name: Stablecoins
-  #       address: [
-  #           "0x1d17cbcf0d6d143135ae902365d2e5e2a16538d4", # UDSC
-  #         ]
+  - id: 324 # ZKsync
+    start_block: 0
+    contracts:
+      - name: Stablecoins
+        address: [
+            "0x1d17cbcf0d6d143135ae902365d2e5e2a16538d4", # UDSC
+          ]
   # - id: 480 # Worldchain
   #   start_block: 0
   #   contracts:
@@ -248,10 +248,10 @@ chains:
         address: [
           "0x20c00000000000000000000014f22ca97301eb73", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0x20c000000000000000000000b9537d11c60e8b50", # USDC
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0x20c000000000000000000000b9537d11c60e8b50", # USDC
+          ]
   # - id: 4326 # Megaeth
   #   start_block: 0
   #   contracts:
@@ -277,14 +277,14 @@ chains:
     # contracts:
     #   - name: Stablecoins
     #     address: []
-  # - id: 8453 # Base
-  #   start_block: 0
-  #   contracts:
-  #     - name: Stablecoins
-  #       address: [
-  #         "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", # USDC
-  #         "0xc708b6887db46005da033501f8aebee72d191a5d", # USDtb
-  #       ]
+  - id: 8453 # Base
+    start_block: 0
+    contracts:
+      - name: Stablecoins
+        address: [
+          "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", # USDC
+          "0xc708b6887db46005da033501f8aebee72d191a5d", # USDtb
+        ]
   # - id: 9745 # Plasma
   #   start_block: 0
   #   contracts:
@@ -307,13 +307,13 @@ chains:
         address: [
           "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0xaf88d065e77c8cc2239327c5edb3a432268e5831", # USDC
-  #           "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8", # USDC.e
-  #           "0x46850ad61c2b7d64d08c9c754f45254596696984", # DAI
-  #           "0xc708b6887db46005da033501f8aebee72d191a5d", # USDtb
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0xaf88d065e77c8cc2239327c5edb3a432268e5831", # USDC
+            "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8", # USDC.e
+            "0x46850ad61c2b7d64d08c9c754f45254596696984", # DAI
+            "0xc708b6887db46005da033501f8aebee72d191a5d", # USDtb
+          ]
   # - id: 42170 # Arbitrum Nova
     # start_block: 0
     # contracts:
@@ -326,10 +326,10 @@ chains:
         address: [
           "0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0xceba9300f2b948710d2653dd7b07f33a8b32118c", # USDC
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0xceba9300f2b948710d2653dd7b07f33a8b32118c", # USDC
+          ]
   # - id: 42793 # Etherlink
   #   start_block: 0
   #   contracts:
@@ -342,11 +342,11 @@ chains:
         address: [
           "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e", # USDC
-  #           "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34", # Ethena USDe
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e", # USDC
+            "0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34", # Ethena USDe
+          ]
   # - id: 48900 # Zircuit
   #   start_block: 0
   #   contracts:
@@ -389,12 +389,12 @@ chains:
         address: [
           "0xda6087e69c51e7d31b6dbad276a3c44703dfdcad", # USDT
         ]
-  #     - name: Stablecoins
-  #       address: [
-  #           "0x222365ef19f7947e5484218551b56bb3965aa7af", # USDC
-  #           "0x78add880a697070c1e765ac44d65323a0dcce913", # USDC.e
-  #           "0x111111d2bf19e43c34263401e0cad979ed1cdb61", # USD1
-  #         ]
+      - name: Stablecoins
+        address: [
+            "0x222365ef19f7947e5484218551b56bb3965aa7af", # USDC
+            "0x78add880a697070c1e765ac44d65323a0dcce913", # USDC.e
+            "0x111111d2bf19e43c34263401e0cad979ed1cdb61", # USD1
+          ]
   # - id: 534352 # Scroll
     # start_block: 0
     # contracts:
