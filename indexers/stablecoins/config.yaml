@@ -19,6 +19,13 @@ contracts:
   - name: USDTBridged
     events:
       - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+  # Ondo RWADynamicOracle — source of USDY NAV. The token itself has no price
+  # concept; NAV lives here. These events fire only when Ondo changes the rate
+  # schedule (~monthly); the daily NAV series is computed from their params.
+  - name: USDYNavOracle
+    events:
+      - event: "RangeSet(uint256 indexed index, uint256 start, uint256 end, uint256 dailyInterestRate, uint256 prevRangeClosePrice)"
+      - event: "RangeOverriden(uint256 indexed index, uint256 newStart, uint256 newEnd, uint256 newDailyInterestRate, uint256 newPrevRangeClosePrice)"
 chains:
   - id: 1 # Ethereum Mainnet
     start_block: 0
@@ -26,6 +33,10 @@ chains:
       - name: USDT
         address: [
           "0xdac17f958d2ee523a2206206994597c13d831ec7", # USDT
+        ]
+      - name: USDYNavOracle
+        address: [
+          "0xa0219aa5b31e65bc920b5b6dfb8edf0988121de0", # Ondo USDY Price Oracle
         ]
       - name: Stablecoins
         address: [

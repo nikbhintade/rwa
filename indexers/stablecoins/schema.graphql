@@ -38,3 +38,32 @@ type DailyActiveAddress {
   date: Int! @index
   address: String! @index
 }
+
+# --- USDY NAV (Ondo RWADynamicOracle) ---
+# A rate segment of the NAV curve, set via RangeSet / RangeOverriden. NAV within
+# a segment accrues by compounding `dailyInterestRate` (RAY, 1e27) off
+# `prevRangeClosePrice` (18-dec) and emits no per-price event, so the daily
+# series in NavDay is computed from these parameters.
+type NavRange {
+  id: ID! # {chainId}_{rangeIndex}
+  chainId: Int!
+  oracle: String! @index
+  rangeIndex: Int! @index
+  start: BigInt! # segment start timestamp (seconds)
+  end: BigInt! # segment end timestamp (exclusive)
+  dailyInterestRate: BigInt! # RAY (1e27) per-day multiplier
+  prevRangeClosePrice: BigInt! # 18-dec price anchoring this segment
+  overridden: Boolean! # true if last written by RangeOverriden
+  updatedAt: BigInt! # block timestamp of the last set/override
+}
+
+# One NAV datapoint per elapsed day of a range. price is 18-dec fixed point with
+# 8-dec precision, matching the oracle's roundUpTo8 / getPriceHistorical output.
+type NavDay @index(fields: [["date", "DESC"]]) {
+  id: ID! # {chainId}_{date}
+  chainId: Int!
+  oracle: String! @index
+  rangeIndex: Int! @index
+  date: Int! # UTC-midnight-aligned day timestamp (start + d*86400)
+  price: BigInt! # NAV in 18 decimals
+}
