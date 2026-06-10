@@ -9,8 +9,17 @@ export const tokens: Token[] = [
     id: "usdt",
     symbol: "USDT",
     name: "Tether USD",
+    // Binance-Peg USDT on BNB Chain is 18 decimals; every other deployment is 6.
     chains: [
       { chainId: 1, address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6 },
+      { chainId: 10, address: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58", decimals: 6 },
+      { chainId: 56, address: "0x55d398326f99059fF775485246999027B3197955", decimals: 18 },
+      { chainId: 137, address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", decimals: 6 },
+      { chainId: 4217, address: "0x20C00000000000000000000014f22CA97301EB73", decimals: 6 },
+      { chainId: 42161, address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", decimals: 6 },
+      { chainId: 42220, address: "0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e", decimals: 6 },
+      { chainId: 43114, address: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7", decimals: 6 },
+      { chainId: 98866, address: "0xda6087E69C51E7D31b6DBAD276a3c44703DFdCAd", decimals: 6 },
     ],
   },
   {
