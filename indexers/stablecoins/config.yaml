@@ -26,6 +26,13 @@ contracts:
     events:
       - event: "RangeSet(uint256 indexed index, uint256 start, uint256 end, uint256 dailyInterestRate, uint256 prevRangeClosePrice)"
       - event: "RangeOverriden(uint256 indexed index, uint256 newStart, uint256 newEnd, uint256 newDailyInterestRate, uint256 newPrevRangeClosePrice)"
+  # Hashnote/Circle YieldTokenAggregator — USYC NAV oracle. Logs emit from the
+  # proxy. BalanceReported prints NAV (price, 8-dec) once per business day;
+  # NextPriceReported gives next-day subscription price (also on owner override).
+  - name: USYCOracle
+    events:
+      - event: "BalanceReported(uint80 roundId, uint256 balance, uint256 interest, uint256 price, uint256 updatedAt)"
+      - event: "NextPriceReported(uint256 price)"
 chains:
   - id: 1 # Ethereum Mainnet
     start_block: 0
@@ -37,6 +44,10 @@ chains:
       - name: USDYNavOracle
         address: [
           "0xa0219aa5b31e65bc920b5b6dfb8edf0988121de0", # Ondo USDY Price Oracle
+        ]
+      - name: USYCOracle
+        address: [
+          "0x4c48bcb2160f8e0adbf9d4f3b034f1e36d1f8b3e", # Hashnote USYC NAV oracle (proxy)
         ]
       - name: Stablecoins
         address: [
