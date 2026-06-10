@@ -5,11 +5,20 @@ contracts:
   - name: Stablecoins
     events:
       - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+  # Ethereum mainnet USDT: issue/redeem do NOT emit Transfer, so supply is
+  # tracked via the custom Issue/Redeem events.
   - name: USDT
     events:
       - event: "Transfer(address indexed from, address indexed to, uint256 value)"
       - event: "Issue(uint256 amount)"
       - event: "Redeem(uint256 amount)"
+  # Bridged USDT (all non-Ethereum chains): mint/burn/redeem internally call
+  # _mint/_burn which emit Transfer to/from the zero address, so the Transfer
+  # handler already tracks supply. Registering Mint/Burn/Redeem here would
+  # double-count.
+  - name: USDTBridged
+    events:
+      - event: "Transfer(address indexed from, address indexed to, uint256 value)"
 chains:
   - id: 1 # Ethereum Mainnet
     start_block: 0
@@ -17,7 +26,7 @@ chains:
       - name: USDT
         address: [
           "0xdac17f958d2ee523a2206206994597c13d831ec7", # USDT
-        ] 
+        ]
       - name: Stablecoins
         address: [
             "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", # USDC
@@ -36,6 +45,10 @@ chains:
   - id: 10 # Optimism
     start_block: 0
     contracts:
+      - name: USDTBridged
+        address: [
+          "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0x0b2c639c533813f4aa9d7837caf62653d097ff85", # USDC
@@ -66,6 +79,10 @@ chains:
   - id: 56 # BSC
     start_block: 0
     contracts:
+      - name: USDTBridged
+        address: [
+          "0x55d398326f99059ff775485246999027b3197955", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", # USDC
@@ -85,6 +102,10 @@ chains:
   - id: 137 # Polygon
     start_block: 0
     contracts:
+      - name: USDTBridged
+        address: [
+          "0xc2132d05d31c914a87c6611c10748aeb04b58e8f", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0x2791bca1f2de4661ed88a30c99a7a9449aa84174", # USDC.e
@@ -220,9 +241,13 @@ chains:
     #     address: []
   - id: 4217 # Tempo
     start_block: 0
-    hypersync_config: 
+    hypersync_config:
       url: https://tempo.hypersync.xyz/
     contracts:
+      - name: USDTBridged
+        address: [
+          "0x20c00000000000000000000014f22ca97301eb73", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0x20c000000000000000000000b9537d11c60e8b50", # USDC
@@ -278,6 +303,10 @@ chains:
   - id: 42161 # Arbitrum
     start_block: 0
     contracts:
+      - name: USDTBridged
+        address: [
+          "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0xaf88d065e77c8cc2239327c5edb3a432268e5831", # USDC
@@ -293,6 +322,10 @@ chains:
   - id: 42220 # Celo
     start_block: 0
     contracts:
+      - name: USDTBridged
+        address: [
+          "0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0xceba9300f2b948710d2653dd7b07f33a8b32118c", # USDC
@@ -305,6 +338,10 @@ chains:
   - id: 43114 # Avalanche
     start_block: 0
     contracts:
+      - name: USDTBridged
+        address: [
+          "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e", # USDC
@@ -348,6 +385,10 @@ chains:
   - id: 98866 # Plume
     start_block: 0
     contracts:
+      - name: USDTBridged
+        address: [
+          "0xda6087e69c51e7d31b6dbad276a3c44703dfdcad", # USDT
+        ]
       - name: Stablecoins
         address: [
             "0x222365ef19f7947e5484218551b56bb3965aa7af", # USDC

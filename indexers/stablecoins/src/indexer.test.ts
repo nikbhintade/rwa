@@ -6,9 +6,9 @@ const ZERO_ADDRESS =
   "0x0000000000000000000000000000000000000000" as `0x${string}`;
 const CHAIN_ID = 1;
 
-// Arbitrary token address — must match one in config.yaml (generic ERC20 contract)
+// Token address — must match one in config.yaml. USDT on Ethereum mainnet.
 const TOKEN_ADDRESS =
-  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as `0x${string}`; // USDC checksummed
+  "0xdAC17F958D2ee523a2206206994597C13D831ec7" as `0x${string}`; // USDT checksummed
 
 const DAY_0_TIMESTAMP = 86400 * 20000; // day 20000
 const DAY_1_TIMESTAMP = 86400 * 20001; // day 20001
@@ -33,7 +33,7 @@ function makeTransfer(
   timestamp = DAY_0_TIMESTAMP
 ) {
   return {
-    contract: "ERC20" as const,
+    contract: "USDT" as const,
     event: "Transfer" as const,
     params: { from, to, value },
     block: { timestamp },

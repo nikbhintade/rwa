@@ -183,6 +183,9 @@ indexer.onEvent(
   },
 );
 
+// Ethereum mainnet USDT. issue/redeem do NOT emit Transfer, so supply is
+// adjusted from the custom Issue/Redeem events; normal transfers come through
+// the Transfer handler.
 indexer.onEvent(
   { contract: "USDT", event: "Transfer" },
   async ({ event, context }) => {
@@ -201,5 +204,15 @@ indexer.onEvent(
   { contract: "USDT", event: "Redeem" },
   async ({ event, context }) => {
     await handleSupplyChange(event, context, "burn");
+  },
+);
+
+// Bridged USDT (all non-Ethereum chains). mint/burn/redeem internally emit
+// Transfer to/from the zero address, so the Transfer handler tracks supply for
+// the whole lifecycle — no separate supply-change handler needed.
+indexer.onEvent(
+  { contract: "USDTBridged", event: "Transfer" },
+  async ({ event, context }) => {
+    await handleTransfer(event, context);
   },
 );
