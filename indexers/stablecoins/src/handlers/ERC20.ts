@@ -2,6 +2,8 @@ import { indexer, type EvmOnEventContext } from "envio";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
+type AssetClass = "stablecoin" | "treasury";
+
 async function handleTransfer(
   event: {
     chainId: number;
@@ -10,6 +12,7 @@ async function handleTransfer(
     params: { from: string; to: string; value: bigint };
   },
   context: EvmOnEventContext,
+  assetClass: AssetClass,
 ) {
   const { from, to, value } = event.params;
   const chainId = event.chainId;
@@ -58,6 +61,7 @@ async function handleTransfer(
     id: tokenId,
     chainId,
     address: tokenAddress,
+    assetClass,
     totalSupply: newTotalSupply,
     lastDayId: currentDayId,
   });
@@ -120,6 +124,7 @@ async function handleSupplyChange(
   },
   context: EvmOnEventContext,
   direction: "mint" | "burn",
+  assetClass: AssetClass,
 ) {
   const { amount } = event.params;
   const chainId = event.chainId;
@@ -156,6 +161,7 @@ async function handleSupplyChange(
     id: tokenId,
     chainId,
     address: tokenAddress,
+    assetClass,
     totalSupply: newTotalSupply,
     lastDayId: currentDayId,
   });
@@ -179,7 +185,7 @@ async function handleSupplyChange(
 indexer.onEvent(
   { contract: "Stablecoins", event: "Transfer" },
   async ({ event, context }) => {
-    await handleTransfer(event, context);
+    await handleTransfer(event, context, "stablecoin");
   },
 );
 
@@ -189,21 +195,21 @@ indexer.onEvent(
 indexer.onEvent(
   { contract: "USDT", event: "Transfer" },
   async ({ event, context }) => {
-    await handleTransfer(event, context);
+    await handleTransfer(event, context, "stablecoin");
   },
 );
 
 indexer.onEvent(
   { contract: "USDT", event: "Issue" },
   async ({ event, context }) => {
-    await handleSupplyChange(event, context, "mint");
+    await handleSupplyChange(event, context, "mint", "stablecoin");
   },
 );
 
 indexer.onEvent(
   { contract: "USDT", event: "Redeem" },
   async ({ event, context }) => {
-    await handleSupplyChange(event, context, "burn");
+    await handleSupplyChange(event, context, "burn", "stablecoin");
   },
 );
 
@@ -213,6 +219,15 @@ indexer.onEvent(
 indexer.onEvent(
   { contract: "USDTBridged", event: "Transfer" },
   async ({ event, context }) => {
-    await handleTransfer(event, context);
+    await handleTransfer(event, context, "stablecoin");
+  },
+);
+
+// US Treasuries asset class. Standard ERC-20s — supply/holders from Transfer,
+// same as the Stablecoins group.
+indexer.onEvent(
+  { contract: "Treasuries", event: "Transfer" },
+  async ({ event, context }) => {
+    await handleTransfer(event, context, "treasury");
   },
 );

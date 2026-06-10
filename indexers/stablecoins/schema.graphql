@@ -1,7 +1,13 @@
+enum AssetClass {
+  stablecoin
+  treasury
+}
+
 type Token {
   id: ID! # {chainId}_{tokenAddress}
   chainId: Int!
   address: String! @index
+  assetClass: AssetClass! @index
   totalSupply: BigInt!
   lastDayId: Int!
   dayData: [TokenDayData!]! @derivedFrom(field: "token")

@@ -19,6 +19,13 @@ contracts:
   - name: USDTBridged
     events:
       - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+  # US Treasuries asset class — tokenised money-market / T-bill funds (USYC,
+  # BUIDL, USDY, BENJI/iBENJI, WTGXX, JTRSY, USTB, OUSG, CUMIU, USTBL, FDIT).
+  # All standard ERC-20s; supply/holders tracked from Transfer (zero-address
+  # mints/burns), same as the Stablecoins group.
+  - name: Treasuries
+    events:
+      - event: "Transfer(address indexed from, address indexed to, uint256 value)"
   # Ondo RWADynamicOracle — source of USDY NAV. The token itself has no price
   # concept; NAV lives here. These events fire only when Ondo changes the rate
   # schedule (~monthly); the daily NAV series is computed from their params.
@@ -37,6 +44,23 @@ chains:
   - id: 1 # Ethereum Mainnet
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0x136471a34f6ef19fe571effc1ca711fdb8e49f2b", # USYC
+            "0x6a9da2d710bb9b700acde7cb81f10f1ff8c89041", # BUIDL-I
+            "0x7712c34205737192402172409a8f7ccef8aa2aec", # BUIDL
+            "0x96f6ef951840721adbf46ac996b59e0235cb985c", # USDY
+            "0xe86845788d6e3e5c2393ade1a051ae617d974c09", # USDYc
+            "0x90276e9d4a023b5229e0c2e9d4b2a83fe3a2b48c", # iBENJI
+            "0x1fecf3d9d4fee7f2c02917a66028a48c6706c179", # WTGXX
+            "0x8c213ee79581ff4984583c6a801e5263418c4b86", # JTRSY
+            "0x3ddc84940ab509c11b20b76b466933f40b750dc9", # BENJI
+            "0x43415eb6ff9db7e26a15b704e7a3edce97d31c4e", # USTB
+            "0x1b19c19393e2d034d8ff31ff34c81252fcbbee92", # OUSG
+            "0x85d38585c3ac08268f598282a84b7c0ddfc0d04f", # CUMIU
+            "0xe4880249745eac5f1ed9d8f7df844792d560e750", # USTBL
+            "0x48ab4e39ac59f4e88974804b04a991b3a402717f", # FDIT
+          ]
       - name: USDT
         address: [
           "0xdac17f958d2ee523a2206206994597c13d831ec7", # USDT
@@ -67,6 +91,11 @@ chains:
   - id: 10 # Optimism
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0xa1cdab15bba75a80df4089cafba013e376957cf5", # BUIDL
+            "0x870fd36b3bf7f5abeeea2c8d4abdf1dc4e33109d", # WTGXX
+          ]
       - name: USDTBridged
         address: [
           "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58", # USDT
@@ -101,6 +130,13 @@ chains:
   - id: 56 # BSC
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0x8d0fa28f221eb5735bc71d3a0da67ee5bc821311", # USYC
+            "0x2d5bdc96d9c8aabbdb38c9a27398513e7e5ef84f", # BUIDL
+            "0x3d0a2a3a30a43a2c1c4b92033609245e819ae6a6", # iBENJI
+            "0xa5d465251fbcc907f5dd6bb2145488dfc6a2627b", # JTRSY
+          ]
       - name: USDTBridged
         address: [
           "0x55d398326f99059ff775485246999027b3197955", # USDT
@@ -124,6 +160,13 @@ chains:
   - id: 137 # Polygon
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0x2893ef551b6dd69f661ac00f11d93e5dc5dc0e99", # BUIDL
+            "0x408a634b8a8f0de729b48574a3a7ec3fe820b00a", # BENJI
+            "0xba11c5effa33c4d6f8f593cfa394241cfe925811", # OUSG
+            "0xe4880249745eac5f1ed9d8f7df844792d560e750", # USTBL
+          ]
       - name: USDTBridged
         address: [
           "0xc2132d05d31c914a87c6611c10748aeb04b58e8f", # USDT
@@ -216,11 +259,13 @@ chains:
   #   contracts:
   #     - name: Stablecoins
   #       address: []
-  # - id: 1329 # Sei
-  #   start_block: 0
-  #   contracts:
-  #     - name: Stablecoins
-  #       address: []
+  - id: 1329 # Sei
+    start_block: 0
+    contracts:
+      - name: Treasuries
+        address: [
+            "0x54cd901491aef397084453f4372b93c33260e2a6", # USDY
+          ]
   # - id: 1750 # Metall2
   #   start_block: 0
   #   contracts:
@@ -279,11 +324,13 @@ chains:
   #   contracts:
   #     - name: Stablecoins
   #       address: []
-  # - id: 5000 # Mantle
-  #   start_block: 0
-  #   contracts:
-  #     - name: Stablecoins
-  #       address: []
+  - id: 5000 # Mantle
+    start_block: 0
+    contracts:
+      - name: Treasuries
+        address: [
+            "0x5be26527e817998a7206475496fde1e68957c5a6", # USDY
+          ]
   # - id: 5330 # Superseed
   #   start_block: 0
   #   contracts:
@@ -302,6 +349,13 @@ chains:
   - id: 8453 # Base
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0x5096b85ed11798fddcb8b5cb27c399c04689c435", # WTGXX
+            "0x8c213ee79581ff4984583c6a801e5263418c4b86", # JTRSY
+            "0x60cfc2b186a4cf647486e42c42b11cc6d571d1e4", # BENJI
+            "0xe4880249745eac5f1ed9d8f7df844792d560e750", # USTBL
+          ]
       - name: Stablecoins
         address: [
           "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", # USDC
@@ -325,6 +379,15 @@ chains:
   - id: 42161 # Arbitrum
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0xa6525ae43edcd03dc08e775774dcabd3bb925872", # BUIDL
+            "0x35e050d3c0ec2d29d269a8ecea763a183bdf9a9d", # USDY
+            "0xfeb26f0943c3885b2cb85a9f933975356c81c33d", # WTGXX
+            "0x8c213ee79581ff4984583c6a801e5263418c4b86", # JTRSY
+            "0xb9e4765bce2609bc1949592059b17ea72fee6c6a", # BENJI
+            "0x021289588cd81dc1ac87ea91e91607eef68303f5", # USTBL
+          ]
       - name: USDTBridged
         address: [
           "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", # USDT
@@ -344,6 +407,10 @@ chains:
   - id: 42220 # Celo
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0x27e8c820d05aea8824b1ac35116f63f9833b54c8", # JTRSY
+          ]
       - name: USDTBridged
         address: [
           "0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e", # USDT
@@ -360,6 +427,13 @@ chains:
   - id: 43114 # Avalanche
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0x53fc82f14f009009b440a706e31c9021e1196a2f", # BUIDL
+            "0x870fd36b3bf7f5abeeea2c8d4abdf1dc4e33109d", # WTGXX
+            "0xa5d465251fbcc907f5dd6bb2145488dfc6a2627b", # JTRSY
+            "0xe08b4c1005603427420e64252a8b120cace4d122", # BENJI
+          ]
       - name: USDTBridged
         address: [
           "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7", # USDT
@@ -407,6 +481,13 @@ chains:
   - id: 98866 # Plume
     start_block: 0
     contracts:
+      - name: Treasuries
+        address: [
+            "0xd2b65e851be3d80d3c2ce795eb2e78f16cb088b2", # USDY
+            "0xcf7a8813bd3bdaf70a9f46d310ce1ee8d80a4f5a", # WTGXX
+            "0xa5d465251fbcc907f5dd6bb2145488dfc6a2627b", # JTRSY
+            "0xe4fa682f94610ccd170680cc3b045d77d9e528a8", # USTB
+          ]
       - name: USDTBridged
         address: [
           "0xda6087e69c51e7d31b6dbad276a3c44703dfdcad", # USDT
