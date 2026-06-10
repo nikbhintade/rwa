@@ -56,6 +56,7 @@ describe("Mint", () => {
 
     const token = await indexer.Token.get(tokenId());
     expect(token?.totalSupply).toBe(1000n);
+    expect(token?.assetClass).toBe("stablecoin");
 
     const receiverBalance = await indexer.HolderBalance.get(holderBalanceId(receiver));
     expect(receiverBalance?.balance).toBe(1000n);
@@ -96,6 +97,7 @@ describe("Burn", () => {
       id: tokenId(),
       chainId: CHAIN_ID,
       address: TOKEN_ADDRESS,
+      assetClass: "stablecoin",
       totalSupply: 500n,
       lastDayId: 20000,
     });
@@ -210,6 +212,7 @@ describe("Day rollover", () => {
       id: tokenId(),
       chainId: CHAIN_ID,
       address: TOKEN_ADDRESS,
+      assetClass: "stablecoin",
       totalSupply: 1000n,
       lastDayId: 20000,
     });
@@ -249,5 +252,32 @@ describe("Day rollover", () => {
 
     const newEntry = await indexer.DailyActiveAddress.get(activeAddrId(20001, newSender));
     expect(newEntry).toBeDefined();
+  });
+});
+
+describe("Asset class", () => {
+  it("tags Treasuries transfers as the treasury asset class", async () => {
+    const indexer = createTestIndexer();
+    const receiver = Addresses.mockAddresses[0]! as `0x${string}`;
+
+    await indexer.process({
+      chains: {
+        [CHAIN_ID]: {
+          simulate: [
+            {
+              contract: "Treasuries" as const,
+              event: "Transfer" as const,
+              params: { from: ZERO_ADDRESS, to: receiver, value: 1000n },
+              block: { timestamp: DAY_0_TIMESTAMP },
+              srcAddress: TOKEN_ADDRESS,
+            },
+          ],
+        },
+      },
+    });
+
+    const token = await indexer.Token.get(tokenId());
+    expect(token?.assetClass).toBe("treasury");
+    expect(token?.totalSupply).toBe(1000n);
   });
 });
