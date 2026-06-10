@@ -13,6 +13,10 @@ import type { Token, TokenStats } from "./types";
 
 const tokenById = new Map(tokens.map((t) => [t.id, t]));
 
+// Only stablecoins are surfaced for now; US Treasuries are gated off in the UI
+// and not yet indexed, so we don't query their stats.
+const activeTokens = tokens.filter((t) => t.assetClass === "stablecoin");
+
 function App() {
   const [selected, setSelected] = useState<Token | undefined>();
   // null = all chains; otherwise the shared/selected chain filter.
@@ -46,7 +50,7 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAllStats(tokens)
+    fetchAllStats(activeTokens)
       .then((s) => {
         if (!cancelled) setStats(s);
       })

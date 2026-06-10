@@ -172,6 +172,7 @@ export function TokenDetail({
               chainId={c.chainId}
               address={c.address}
               active={c.chainId === chainFilter}
+              indexed={c.indexed !== false}
               onToggle={() => onChainFilter(c.chainId === chainFilter ? null : c.chainId)}
               onCopy={() => handleCopy(c.address)}
             />
@@ -284,12 +285,14 @@ function ChainChip({
   chainId,
   address,
   active,
+  indexed,
   onToggle,
   onCopy,
 }: {
   chainId: number;
   address: string;
   active: boolean;
+  indexed: boolean;
   onToggle: () => void;
   onCopy: () => void;
 }) {
@@ -301,21 +304,32 @@ function ChainChip({
         active
           ? "border-[var(--color-accent)] bg-[var(--color-accent-bg)]"
           : "border-[var(--color-border-default)] bg-[var(--color-bg-surface)]"
-      }`}
+      } ${indexed ? "" : "opacity-60"}`}
     >
       <button
-        onClick={onToggle}
-        title={active ? `Showing ${chain.name} only — click to clear` : `Filter to ${chain.name}`}
-        className="flex items-center gap-1.5"
+        onClick={indexed ? onToggle : undefined}
+        disabled={!indexed}
+        title={
+          !indexed
+            ? `${chain.name} not indexed yet`
+            : active
+              ? `Showing ${chain.name} only — click to clear`
+              : `Filter to ${chain.name}`
+        }
+        className={`flex items-center gap-1.5 ${indexed ? "" : "cursor-not-allowed"}`}
       >
         <span
           className="h-2 w-2 rounded-full"
-          style={{ background: chain.color }}
+          style={{ background: indexed ? chain.color : "var(--color-text-muted)" }}
           aria-hidden="true"
         />
         <span
           className={`text-[10.5px] font-medium ${
-            active ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"
+            !indexed
+              ? "text-[var(--color-text-muted)]"
+              : active
+                ? "text-[var(--color-text-primary)]"
+                : "text-[var(--color-text-secondary)]"
           }`}
         >
           {chain.name}
@@ -323,6 +337,11 @@ function ChainChip({
         <span className="font-mono text-[10px] text-[var(--color-text-tertiary)]">
           {shortAddr(address)}
         </span>
+        {!indexed && (
+          <span className="rounded-sm bg-[var(--color-bg-elevated)] px-1 py-px text-[7.5px] font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">
+            Soon
+          </span>
+        )}
       </button>
       <button
         onClick={onCopy}

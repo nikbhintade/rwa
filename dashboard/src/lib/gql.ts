@@ -73,17 +73,21 @@ type DayRaw = {
 type BatchRaw = { Token: TokenRaw[]; TokenDayData: DayRaw[] };
 
 /** Build a lookup of every valid (chainId, address) deployment -> its ChainToken. */
+// Deployments flagged `indexed: false` (e.g. non-Ethereum USDT) aren't in the
+// indexer, so they're excluded from queries and stats entirely.
+const isIndexed = (c: ChainToken) => c.indexed !== false;
+
 function deploymentIndex(tokens: Token[]): Map<string, ChainToken> {
   const m = new Map<string, ChainToken>();
   for (const t of tokens) {
-    for (const c of t.chains) m.set(chainKey(c.chainId, c.address), c);
+    for (const c of t.chains) if (isIndexed(c)) m.set(chainKey(c.chainId, c.address), c);
   }
   return m;
 }
 
 function uniqueAddrs(tokens: Token[]): string[] {
   const set = new Set<string>();
-  for (const t of tokens) for (const c of t.chains) set.add(c.address);
+  for (const t of tokens) for (const c of t.chains) if (isIndexed(c)) set.add(c.address);
   return [...set];
 }
 
@@ -151,14 +155,15 @@ function toDay(d: DayRaw, decimals: number): TokenDay {
 /** 365-day stats for one logical token: per-chain series plus a summed aggregate. */
 export async function fetchTokenDetail(token: Token): Promise<TokenStats> {
   const minDate = todayMidnightSecs() - 365 * DAY_SECS;
-  const addrs = token.chains.map((c) => c.address);
+  const chains = token.chains.filter(isIndexed);
+  const addrs = chains.map((c) => c.address);
   const data = await gql<BatchRaw>(DETAIL_QUERY, { addrs, minDate });
 
   const index = new Map<string, ChainToken>();
-  for (const c of token.chains) index.set(chainKey(c.chainId, c.address), c);
+  for (const c of chains) index.set(chainKey(c.chainId, c.address), c);
 
   const seriesByChain = new Map<number, ChainSeries>();
-  for (const c of token.chains) {
+  for (const c of chains) {
     if (!seriesByChain.has(c.chainId)) {
       seriesByChain.set(c.chainId, { chainId: c.chainId, totalSupply: null, days: [] });
     }

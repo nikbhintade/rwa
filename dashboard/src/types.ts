@@ -3,13 +3,21 @@ export type ChainToken = {
   chainId: number;
   address: string;
   decimals: number;
+  /** Whether this deployment is actually indexed. Defaults to true; set false to
+   *  gate a chip off in the UI (e.g. USDT is only indexed on Ethereum). */
+  indexed?: boolean;
 };
+
+/** Asset class a token belongs to. Lives in the dashboard's token data, not in
+ *  the GraphQL schema, so it is never part of a query. */
+export type AssetClass = "stablecoin" | "treasury" | "credit" | "stock";
 
 /** A logical token (e.g. USDC) that may live on many chains. */
 export type Token = {
   id: string;
   symbol: string;
   name: string;
+  assetClass: AssetClass;
   chains: ChainToken[];
 };
 

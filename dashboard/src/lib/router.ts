@@ -7,7 +7,10 @@ export function parseHash(hash: string): Route {
   const raw = hash.replace(/^#\/?/, "").trim();
   if (!raw) return {};
   const [tokenId, chainStr] = raw.split("/");
-  const valid = tokens.some((t) => t.id === tokenId);
+  // US Treasuries are gated off for now — only stablecoin routes resolve.
+  const valid = tokens.some(
+    (t) => t.id === tokenId && t.assetClass === "stablecoin",
+  );
   if (!valid) return {};
   const chainId = chainStr ? Number(chainStr) : NaN;
   return { tokenId, chainId: Number.isFinite(chainId) ? chainId : undefined };

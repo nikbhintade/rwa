@@ -1,13 +1,21 @@
 import { useMemo, useState } from "react";
 import { tokens } from "../data/tokens";
 import { chainById } from "../data/chains";
-import type { Token, TokenStats } from "../types";
+import type { AssetClass, Token, TokenStats } from "../types";
 import { assembleFromChainStats, type ChainStatsMap } from "../lib/gql";
 import { formatCompact } from "../lib/format";
 import { Sparkline } from "./Sparkline";
 
 type SortKey = "transfer" | "supply";
 type SortDir = "asc" | "desc";
+
+// Only stablecoins are live; the rest are gated off ("Soon") for now.
+const ASSET_CLASSES: { id: AssetClass; label: string; enabled: boolean }[] = [
+  { id: "stablecoin", label: "Stablecoins", enabled: true },
+  { id: "treasury", label: "US Treasuries", enabled: false },
+  { id: "credit", label: "Tokenized Credit", enabled: false },
+  { id: "stock", label: "Tokenized Stocks", enabled: false },
+];
 
 type Props = {
   selectedId?: string;
@@ -21,7 +29,7 @@ function transferSum(s: TokenStats): number {
 }
 
 export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
-  const [query, setQuery] = useState("");
+  const [assetClass, setAssetClass] = useState<AssetClass>("stablecoin");
   const [sortKey, setSortKey] = useState<SortKey>("supply");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -32,14 +40,7 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
   );
 
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = q
-      ? tokens.filter(
-          (t) =>
-            t.symbol.toLowerCase().includes(q) ||
-            t.name.toLowerCase().includes(q),
-        )
-      : tokens;
+    const filtered = tokens.filter((t) => t.assetClass === assetClass);
 
     const sorted = [...filtered].sort((a, b) => {
       const sa = aggregated.get(a.id)!;
@@ -49,7 +50,7 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
       return sortDir === "asc" ? va - vb : vb - va;
     });
     return sorted;
-  }, [query, sortKey, sortDir, aggregated]);
+  }, [assetClass, sortKey, sortDir, aggregated]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -75,17 +76,32 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
         )}
       </header>
 
-      <div className="border-b border-[var(--color-border-subtle)] px-3 py-3">
-        <div className="relative">
-          <SearchIcon />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search token"
-            className="h-8 w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-base)] pl-7 pr-2 text-[12px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none transition focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent-bg)]"
-          />
-        </div>
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--color-border-subtle)] px-3 py-3">
+        {ASSET_CLASSES.map((ac) => {
+          const active = assetClass === ac.id;
+          return (
+            <button
+              key={ac.id}
+              disabled={!ac.enabled}
+              title={ac.enabled ? undefined : "Coming soon"}
+              onClick={ac.enabled ? () => setAssetClass(ac.id) : undefined}
+              className={`flex items-center gap-1 rounded-md border px-2.5 py-1 text-[10.5px] font-medium transition ${
+                active
+                  ? "border-[var(--color-accent)] bg-[var(--color-accent-bg)] text-[var(--color-text-primary)]"
+                  : ac.enabled
+                    ? "border-[var(--color-border-default)] bg-[var(--color-bg-surface)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
+                    : "cursor-not-allowed border-[var(--color-border-subtle)] text-[var(--color-text-muted)] opacity-60"
+              }`}
+            >
+              {ac.label}
+              {!ac.enabled && (
+                <span className="rounded-sm bg-[var(--color-bg-elevated)] px-1 py-px text-[7.5px] font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]">
+                  Soon
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-[1fr_88px_84px] items-center gap-2 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-base)]/40 px-3 py-2 text-[9.5px] font-medium uppercase tracking-[0.1em] text-[var(--color-text-tertiary)]">
@@ -123,9 +139,7 @@ export function Sidebar({ selectedId, onSelect, stats, loading }: Props) {
       </div>
 
       <footer className="flex items-center justify-between border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-base)]/40 px-3 py-2 text-[9.5px] uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
-        <span>
-          {rows.length} of {tokens.length} tokens
-        </span>
+        <span>{rows.length} tokens</span>
         <span className="font-mono">v2.0</span>
       </footer>
     </aside>
@@ -201,25 +215,4 @@ function Row({
 function sortIndicator(key: SortKey, target: SortKey, dir: SortDir) {
   if (key !== target) return <span className="opacity-30">↕</span>;
   return <span>{dir === "asc" ? "↑" : "↓"}</span>;
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="m11 11 3 3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }

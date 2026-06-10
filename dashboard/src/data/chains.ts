@@ -14,6 +14,8 @@ export const chains: Chain[] = [
   { id: 56, name: "BNB Chain", short: "BNB", color: "#F0B90B", explorer: "https://bscscan.com" },
   { id: 137, name: "Polygon", short: "POL", color: "#8247E5", explorer: "https://polygonscan.com" },
   { id: 324, name: "zkSync Era", short: "ZKS", color: "#8C8DFC", explorer: "https://explorer.zksync.io" },
+  { id: 1329, name: "Sei", short: "SEI", color: "#9E1F19", explorer: "https://seitrace.com" },
+  { id: 5000, name: "Mantle", short: "MNT", color: "#65B3AE", explorer: "https://mantlescan.xyz" },
   { id: 4217, name: "Tempo", short: "TMP", color: "#E76F51", explorer: "" },
   { id: 8453, name: "Base", short: "BASE", color: "#0052FF", explorer: "https://basescan.org" },
   { id: 42161, name: "Arbitrum", short: "ARB", color: "#28A0F0", explorer: "https://arbiscan.io" },
