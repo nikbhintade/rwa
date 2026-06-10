@@ -39,6 +39,42 @@ type DailyActiveAddress {
   address: String! @index
 }
 
+# --- USYC NAV (Hashnote/Circle YieldTokenAggregator oracle) ---
+# USYC is non-rebasing: supply is fixed and the per-token price climbs as yield
+# accrues. The oracle prints NAV directly via BalanceReported, ~once per
+# business day — so each event IS a NAV datapoint (no formula to compute).
+type UsycNavReport {
+  id: ID! # {chainId}_{blockNumber}_{logIndex}
+  chainId: Int!
+  oracle: String! @index
+  roundId: BigInt!
+  price: BigInt! # NAV per token, 8 decimals
+  balance: BigInt! # fund balance / AUM, 2 decimals USD
+  interest: BigInt! # accrued interest, 2 decimals USD
+  updatedAt: BigInt! # oracle report timestamp
+  date: Int! @index # UTC-midnight of updatedAt, for daily charting
+  blockNumber: Int!
+  blockTimestamp: Int!
+}
+
+# Effective subscription price for the next business day. Also fires on owner
+# override via setNextPrice, so it is NOT necessarily a fresh NAV print.
+type UsycNextPrice {
+  id: ID! # {chainId}_{blockNumber}_{logIndex}
+  chainId: Int!
+  price: BigInt! # next-day subscription price, 8 decimals
+  blockTimestamp: Int!
+}
+
+# Singleton per chain (id = {chainId}) holding the latest NAV print.
+type UsycOracleState {
+  id: ID!
+  chainId: Int!
+  latestRoundId: BigInt!
+  latestPrice: BigInt!
+  latestUpdatedAt: BigInt!
+}
+
 # --- USDY NAV (Ondo RWADynamicOracle) ---
 # A rate segment of the NAV curve, set via RangeSet / RangeOverriden. NAV within
 # a segment accrues by compounding `dailyInterestRate` (RAY, 1e27) off
