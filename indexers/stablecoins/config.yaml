@@ -26,6 +26,9 @@ contracts:
   - name: Treasuries
     events:
       - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+      # CUMIU publishes NAV from the token itself (only emitter in this group);
+      # handler filters by srcAddress. newNAV is 1e4 fixed-point (NAVScalingFactor).
+      - event: "updatedNAV(uint256 indexed epoch, uint256 previousNAV, uint256 newNAV)"
   # Ondo RWADynamicOracle — source of USDY NAV. The token itself has no price
   # concept; NAV lives here. These events fire only when Ondo changes the rate
   # schedule (~monthly); the daily NAV series is computed from their params.
@@ -40,6 +43,29 @@ contracts:
     events:
       - event: "BalanceReported(uint80 roundId, uint256 balance, uint256 interest, uint256 price, uint256 updatedAt)"
       - event: "NextPriceReported(uint256 price)"
+  # Superstate USTB NAV oracle. Emits NewCheckpoint anchors; realtime NAV is
+  # linearly interpolated between consecutive checkpoints (navs is 6-dec).
+  - name: UstbNavOracle
+    events:
+      - event: "NewCheckpoint(uint64 timestamp, uint64 effectiveAt, uint128 navs)"
+  # Spiko USTBL NAV — Chainlink EACAggregatorProxy feed "USTBL NAV" (6-dec). The
+  # AnswerUpdated event is emitted by the underlying aggregator, so we index the
+  # aggregator address, not the proxy.
+  - name: UstblNavFeed
+    events:
+      - event: "AnswerUpdated(int256 indexed current, uint256 indexed roundId, uint256 updatedAt)"
+  # Ondo OUSG NAV — RWAOracleExternalComparisonCheck. Ondo pushes the end-of-day
+  # NAV here; newRWAPrice is the OUSG price (18-dec). NAV is a step function
+  # (constant between EOD updates).
+  - name: OusgOracle
+    events:
+      - event: "RWAExternalComparisonCheckPriceSet(int256 oldChainlinkPrice, uint80 indexed oldRoundId, int256 newChainlinkPrice, uint80 indexed newRoundId, int256 oldRWAPrice, int256 newRWAPrice)"
+  # Centrifuge PoolManager — source of JTRSY (Janus Henderson Anemoy Treasury)
+  # price-per-share. PriceUpdate fires for every pool/tranche; the JTRSY handler
+  # filters by poolId + trancheId. price is 18-dec, step between updates.
+  - name: JtrsyPoolManager
+    events:
+      - event: "PriceUpdate(uint64 indexed poolId, bytes16 indexed trancheId, address indexed asset, uint256 price, uint64 computedAt)"
 chains:
   - id: 1 # Ethereum Mainnet
     start_block: 0
@@ -72,6 +98,22 @@ chains:
       - name: USYCOracle
         address: [
           "0x4c48bcb2160f8e0adbf9d4f3b034f1e36d1f8b3e", # Hashnote USYC NAV oracle (proxy)
+        ]
+      - name: UstbNavOracle
+        address: [
+          "0xe4fa682f94610ccd170680cc3b045d77d9e528a8", # Superstate USTB NAV oracle
+        ]
+      - name: UstblNavFeed
+        address: [
+          "0xc1c24f0f2103f5899b7ab415a1930e519b7d3423", # Spiko USTBL NAV aggregator (Chainlink)
+        ]
+      - name: OusgOracle
+        address: [
+          "0x0502c5ae08e7cd64fe1aeda7d6e229413ecc6abe", # Ondo OUSG RWA price oracle
+        ]
+      - name: JtrsyPoolManager
+        address: [
+          "0x91808b5e2f6d7483d41a681034d7c9dbb64b9e29", # Centrifuge PoolManager (JTRSY price source)
         ]
       - name: Stablecoins
         address: [

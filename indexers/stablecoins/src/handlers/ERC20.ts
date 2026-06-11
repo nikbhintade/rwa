@@ -1,4 +1,5 @@
 import { indexer, type EvmOnEventContext } from "envio";
+import { isRebase, recordYieldMint, writeDollarSnapshot } from "./rebaseYield";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -111,6 +112,26 @@ async function handleTransfer(
       date: currentDayId,
       address: from,
     });
+  }
+
+  // Rebase-yield funds (BENJI/iBENJI, BUIDL, WTGXX, FDIT) pin NAV at $1.00 and
+  // pay yield as new shares minted to holders. Record the $1.00 NAV snapshot on
+  // every transfer, and derive the per-share yield rate on dividend mints:
+  // toBalance is the recipient's balance before this mint, exactly the
+  // priorBalance needed.
+  if (assetClass === "treasury" && isRebase(tokenAddress)) {
+    writeDollarSnapshot(context, chainId, tokenAddress, timestamp);
+    if (isMint) {
+      await recordYieldMint({
+        context,
+        chainId,
+        tokenAddress,
+        amount: value,
+        priorBalance: toBalance?.balance ?? 0n,
+        sharesOutstanding: newTotalSupply,
+        timestamp,
+      });
+    }
   }
 }
 

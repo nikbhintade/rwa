@@ -109,3 +109,99 @@ type NavDay @index(fields: [["date", "DESC"]]) {
   date: Int! # UTC-midnight-aligned day timestamp (start + d*86400)
   price: BigInt! # NAV in 18 decimals
 }
+
+# --- Treasury NAV & yield (CUMIU, USTB, USTBL) ---
+# Generic NAV/yield tracking for treasury tokens whose price is published by an
+# oracle. Step oracles print a fresh NAV on each update (CUMIU `updatedNAV`,
+# USTBL Chainlink `AnswerUpdated`); USTB's Superstate oracle emits checkpoints
+# between which NAV is linearly interpolated. `nav` is fixed-point with
+# `decimals` decimals (CUMIU 4, USTB 6, USTBL 6).
+
+# Per-chain-per-oracle singleton: latest NAV plus bookkeeping for daily backfill.
+type NavOracleState {
+  id: ID! # {chainId}_{oracleAddress}
+  chainId: Int!
+  oracle: String! @index
+  token: String!
+  decimals: Int!
+  latestNav: BigInt!
+  latestUpdatedAt: BigInt!
+  lastSnapshotDay: Int! # last 00:00 UTC day already written to NavDailySnapshot
+}
+
+# One row per oracle NAV update (every change). yieldPerAnnum is the simple
+# (non-compounded) annualised yield vs the previous update, scaled 1e18.
+type NavUpdate @index(fields: ["token", ["date", "DESC"]]) {
+  id: ID! # {chainId}_{oracle}_{blockNumber}_{logIndex}
+  chainId: Int!
+  oracle: String! @index
+  token: String! @index
+  nav: BigInt!
+  decimals: Int!
+  prevNav: BigInt
+  yieldPerAnnum: BigInt! # 1e18-scaled annualised yield since prevNav (0 on first)
+  roundId: BigInt # set for Chainlink-style feeds (USTBL)
+  updatedAt: BigInt!
+  date: Int! @index # UTC midnight of updatedAt
+  blockNumber: Int!
+  blockTimestamp: Int!
+}
+
+# NAV at 00:00 UTC, one row per oracle per day. Step oracles snapshot the NAV
+# effective at midnight; USTB interpolates between checkpoints. Filled by
+# backfill on each update, so the current day lands once the next update arrives
+# (<=1 day tail lag).
+type NavDailySnapshot @index(fields: ["token", ["date", "DESC"]]) @index(fields: [["date", "DESC"]]) {
+  id: ID! # {chainId}_{oracle}_{date}
+  chainId: Int!
+  oracle: String! @index
+  token: String! @index
+  date: Int!
+  nav: BigInt!
+  decimals: Int!
+}
+
+# --- Rebase-yield funds (BENJI, iBENJI, BUIDL, BUIDL-I, WTGXX, FDIT) ---
+# These are $1.00-pinned money funds: NAV per share never moves, so yield is
+# paid as new shares minted to every holder (`balance * r`, r identical across
+# holders). We recover the per-share period rate r at the dividend mint as
+# `mint / priorBalance`, confirming a distribution only when >=2 same-day
+# zero-address mints share the ratio (a one-off subscription mint has no matching
+# partner; a new investor with prior balance 0 is skipped). BENJI/iBENJI
+# distribute daily; BUIDL/WTGXX/FDIT distribute ~monthly — periodDays (the gap
+# since the previous distribution) makes the annualisation cadence-agnostic. The
+# constant $1.00 NAV is written separately to NavDailySnapshot from transfers.
+type RebaseYield @index(fields: ["token", ["date", "DESC"]]) @index(fields: [["date", "DESC"]]) {
+  id: ID! # {chainId}_{tokenAddress}_{date}
+  chainId: Int!
+  token: String! @index # BENJI | iBENJI | BUIDL | BUIDL-I | WTGXX | FDIT
+  tokenAddress: String! @index
+  date: Int! # UTC midnight of the distribution
+  periodDays: Int! # days since the previous distribution (0 = first, unknown)
+  periodYield: BigInt! # per-share growth in this distribution, 1e18-scaled (r)
+  annualizedYield: BigInt! # periodYield * 365 / periodDays, 1e18 (0 on first)
+  trailingApy: BigInt! # mean annualizedYield over distributions in the last 7 days, 1e18
+  wowChange: BigInt! # trailingApy minus the trailingApy 7 days ago (signed, 1e18)
+  sharesDistributed: BigInt! # dividend shares minted in this distribution
+  sharesOutstanding: BigInt! # totalSupply right after the distribution
+}
+
+# Per-token detection state. Tracks the open day, the previous distribution day
+# (for periodDays), and up to two candidate ratios; the first candidate to reach
+# >=2 matching mints is the confirmed distribution.
+type RebaseYieldState {
+  id: ID! # {chainId}_{tokenAddress}
+  chainId: Int!
+  token: String!
+  tokenAddress: String!
+  openDay: Int! # UTC midnight currently being accumulated
+  confirmedDay: Int! # day already emitted as a RebaseYield (-1 if none)
+  lastDistDay: Int! # midnight of the previous confirmed distribution (0 if none)
+  curPeriodDays: Int! # periodDays cached for the current day's distribution
+  candRateA: BigInt!
+  candCountA: Int!
+  candSharesA: BigInt!
+  candRateB: BigInt!
+  candCountB: Int!
+  candSharesB: BigInt!
+}
