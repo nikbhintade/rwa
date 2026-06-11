@@ -8,8 +8,7 @@ Built with [HyperIndex](https://envio.dev).
 
 | Indexer | Assets tracked | Status |
 |---------|--------------- |--------|
-| `indexers/stablecoins` | Stablecoins (supply, holders, daily aggregates) + US Treasuries (same, plus NAV & yield) | In-Progress |
-| `indexers/asset-backed-credit` | Syrup USDC, Syrup USDT | Todo |
+| `indexers/rwa-tokens` | Stablecoins (supply, holders, daily aggregates) + US Treasuries (same, plus NAV & yield) | In-Progress |
 
 ## Getting started
 
