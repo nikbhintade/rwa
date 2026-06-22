@@ -1,0 +1,131 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: tokenized-stocks-indexer
+description: Tokenized equities (Backed xStocks + Ondo Global Markets) — supply, holders, daily aggregates, and on-chain NAV
+contracts:
+  # Backed Finance xStocks — 1:1 backed tokenized equities. Standard ERC-20s;
+  # supply/holders from Transfer (zero-address mints/burns). Same token address on
+  # every chain (deterministic deployment).
+  - name: BackedStocks
+    events:
+      - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+  # Ondo Global Markets tokenized equities (*on). Standard ERC-20s; supply/holders
+  # from Transfer. Different token address per chain.
+  - name: OndoStocks
+    events:
+      - event: "Transfer(address indexed from, address indexed to, uint256 value)"
+  # Chainlink push price aggregators = on-chain NAV. AnswerUpdated is emitted by the
+  # underlying OCR aggregator (NOT the proxy), so the aggregator address is indexed
+  # here — resolve it with `aggregator()` on the feed proxy. `current` is the NAV
+  # (8-dec USD); NAV is a step function between updates. See src/handlers/ChainlinkNav.ts
+  # for the aggregator -> token-symbol mapping.
+  - name: ChainlinkNavFeed
+    events:
+      - event: "AnswerUpdated(int256 indexed current, uint256 indexed roundId, uint256 updatedAt)"
+chains:
+  - id: 1 # Ethereum Mainnet
+    start_block: 0
+    contracts:
+      - name: BackedStocks
+        address: [
+            "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3", # STRCx
+            "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0", # TSLAx
+            "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb", # CRCLx
+          ]
+      - name: OndoStocks
+        address: [
+            "0x3632dea96a953c11dac2f00b4a05a32cd1063fae", # CRCLon
+            "0x050362ab1072cb2ce74d74770e22a3203ad04ee5", # MUon
+            "0x62ca254a363dc3c748e7e955c20447ab5bf06ff7", # IVVon
+            "0x2d1f7226bd1f780af6b9a49dcc0ae00e8df4bdee", # NVDAon
+            "0xfedc5f4a6c38211c1338aa411018dfaf26612c08", # SPYon
+            "0x0e397938c1aa0680954093495b70a9f5e2249aba", # QQQon
+            "0xca468554e5c0423ee858fe3942c9568c51fcaa79", # HIMSon
+          ]
+      - name: ChainlinkNavFeed
+        address: [
+            "0x2053257478ba1fedf7f99def0c412006753ac9bf", # SPYon-USD (Calculated) aggregator
+            "0x320e22c489e4bb634ac1aa5822543014a6fbb292", # QQQon-USD (Calculated) aggregator
+            "0x47f0840acb50df9c3b9584017ef1a9560e777b88", # TSLA / USD (24/5) aggregator -> TSLAx NAV
+            "0x725609ae7d540a7985d7fd189e155db9d72c1d44", # STRC / USD aggregator -> STRCx NAV
+            "0x74acdd8ca84ff6a9eb0814e7f000b4f33195152d", # NVDA-USD (24/5) aggregator -> NVDAon NAV (interim, underlying)
+            # No on-chain push feed published for CRCLon, MUon, IVVon, HIMSon, or the
+            # CRCL underlying (CRCLx) — Chainlink serves those via pull-based Data
+            # Streams, which emit no continuous on-chain AnswerUpdated. They cannot be
+            # indexed this way until a push "(Calculated)" feed exists. When one is
+            # published: resolve `aggregator()` on the feed proxy, add the address
+            # here, and map it to a symbol in src/handlers/ChainlinkNav.ts. NVDAon
+            # uses the underlying NVDA feed for now (sValue multiplier omitted, ~1.0
+            # for a non-dividend stock); swap to its Calculated feed when available.
+          ]
+  - id: 10 # Optimism
+    start_block: 0
+    contracts:
+      - name: BackedStocks
+        address: [
+            "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3", # STRCx
+            "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0", # TSLAx
+            "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb", # CRCLx
+          ]
+  - id: 56 # BSC
+    start_block: 0
+    contracts:
+      - name: BackedStocks
+        address: [
+            "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3", # STRCx
+            "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0", # TSLAx
+            "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb", # CRCLx
+          ]
+      - name: OndoStocks
+        address: [
+            "0x992879cd8ce0c312d98648875b5a8d6d042cbf34", # CRCLon
+            "0x8b6acf6041a81567f012ff6a4c6d96d5818d74bf", # MUon
+            "0x1104eb7e85e25eb45f88e638b0c27a06c1a91cb2", # IVVon
+            "0xa9ee28c80f960b889dfbd1902055218cba016f75", # NVDAon
+            "0x6a708ead771238919d85930b5a0f10454e1c331a", # SPYon
+            "0x0cde6936d305d5b34667fc46425e852efd73559a", # QQQon
+            "0x4693f6f5ef257381a28afd0673e64d8b32d5c6ad", # HIMSon
+          ]
+  - id: 999 # HyperEVM (Hyperliquid)
+    start_block: 0
+    contracts:
+      - name: BackedStocks
+        address: [
+            "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0", # TSLAx
+            "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb", # CRCLx
+          ]
+      - name: OndoStocks
+        address: [
+            "0x13a81c5e8b4ab05fc721dff7ba95e250b29458f8", # CRCLon
+            "0x0f8e33f5cdefae9c2e59de8fb61fed347046d046", # MUon
+            "0xad26b6048cc3682f67fe4c829b7ac99dbf95920e", # IVVon
+            "0xb989ad9b91886b1aaed8daadb26f028b29b40945", # NVDAon
+            "0x32ec2792aec02122edd9f28866b720db1e1c1b54", # SPYon
+            "0x911e2dcd2b70f44231f3f0f1c6ec9af75068fd85", # QQQon
+          ]
+  - id: 5000 # Mantle
+    start_block: 0
+    contracts:
+      - name: BackedStocks
+        address: [
+            "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3", # STRCx
+            "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0", # TSLAx
+            "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb", # CRCLx
+          ]
+  - id: 57073 # Ink
+    start_block: 0
+    contracts:
+      - name: BackedStocks
+        address: [
+            "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3", # STRCx
+            "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0", # TSLAx
+            "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb", # CRCLx
+          ]
+  - id: 42161 # Arbitrum
+    start_block: 0
+    contracts:
+      - name: BackedStocks
+        address: [
+            "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3", # STRCx
+            "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0", # TSLAx
+            "0xfebded1b0986a8ee107f5ab1a1c5a813491deceb", # CRCLx
+          ]

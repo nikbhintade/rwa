@@ -1,0 +1,109 @@
+# Tokenized equities ("tokenized stocks") across multiple EVM chains.
+# Two issuers:
+#   - backed : Backed Finance xStocks (STRCx, TSLAx, CRCLx). 1:1 backed, same
+#              token address on every chain (deterministic deployment).
+#   - ondo   : Ondo Global Markets (SPYon, QQQon, NVDAon, IVVon, MUon, CRCLon,
+#              HIMSon). Total-return tokens; a per-token sValue multiplier folds
+#              dividends/corporate actions into the price. Different address per chain.
+enum Issuer {
+  backed
+  ondo
+}
+
+type Token {
+  id: ID! # {chainId}_{tokenAddress}
+  chainId: Int!
+  address: String! @index
+  symbol: String! @index # e.g. TSLAx, SPYon
+  issuer: Issuer! @index
+  totalSupply: BigInt!
+  lastDayId: Int!
+  dayData: [TokenDayData!]! @derivedFrom(field: "token")
+  holders: [HolderBalance!]! @derivedFrom(field: "token")
+}
+
+type TokenDayData @index(fields: ["token", ["date", "DESC"]]) @index(fields: [["date", "DESC"]]) {
+  id: ID! # {chainId}_{tokenAddress}_{dayId}
+  token: Token! @index
+  chainId: Int!
+  date: Int! # Midnight UTC timestamp of the day (dayId * 86400)
+  dailyTotalSupply: BigInt! # End-of-day totalSupply snapshot
+  dailyMintAmount: BigInt!
+  dailyBurnAmount: BigInt!
+  dailyTransferAmount: BigInt!
+  dailyTransferCount: Int!
+  dailyActiveAddresses: Int!
+}
+
+type HolderBalance @index(fields: ["token", ["balance", "DESC"]]) {
+  id: ID! # {chainId}_{tokenAddress}_{holderAddress}
+  token: Token! @index
+  chainId: Int!
+  holder: String! @index
+  balance: BigInt!
+  firstTransferTimestamp: BigInt!
+  lastTransferTimestamp: BigInt!
+}
+
+type DailyActiveAddress {
+  id: ID! # {chainId}_{tokenAddress}_{dayId}_{address}
+  token: Token! @index
+  chainId: Int!
+  date: Int! @index
+  address: String! @index
+}
+
+# --- On-chain NAV (Chainlink price feeds) ---
+# NAV per token is sourced from Chainlink push aggregators that emit
+# `AnswerUpdated(current, roundId, updatedAt)`, exactly like a classic price feed.
+#   - xStocks: the underlying equity feed (e.g. "TSLA / USD") IS the NAV, since the
+#              token is 1:1 backed and carries no multiplier.
+#   - Ondo:    the per-token "XXXon-USD (Calculated)" feed IS the NAV — Chainlink
+#              already folds the SyntheticSharesOracle sValue multiplier into it.
+# Both are 8-decimal USD, step functions (constant between updates). Entities below
+# mirror the generic NAV machinery used in the rwa-tokens indexer.
+
+# Per-chain-per-oracle singleton: latest NAV plus bookkeeping for daily backfill.
+type NavOracleState {
+  id: ID! # {chainId}_{aggregatorAddress}
+  chainId: Int!
+  oracle: String! @index # Chainlink aggregator address (AnswerUpdated emitter)
+  token: String! # token symbol the feed prices, e.g. SPYon
+  decimals: Int!
+  latestNav: BigInt!
+  latestUpdatedAt: BigInt!
+  lastSnapshotDay: Int! # last 00:00 UTC day already written to NavDailySnapshot
+}
+
+# One row per feed update (every NAV change). yieldPerAnnum is the simple
+# (non-compounded) annualised change vs the previous update, scaled 1e18 — for an
+# equity this is the annualised price return since the last print, which can be
+# negative.
+type NavUpdate @index(fields: ["token", ["date", "DESC"]]) {
+  id: ID! # {chainId}_{oracle}_{blockNumber}_{logIndex}
+  chainId: Int!
+  oracle: String! @index
+  token: String! @index
+  nav: BigInt!
+  decimals: Int!
+  prevNav: BigInt
+  yieldPerAnnum: BigInt! # 1e18-scaled annualised change since prevNav (0 on first)
+  roundId: BigInt # Chainlink round id
+  updatedAt: BigInt!
+  date: Int! @index # UTC midnight of updatedAt
+  blockNumber: Int!
+  blockTimestamp: Int!
+}
+
+# NAV at 00:00 UTC, one row per oracle per day. Step feeds snapshot the NAV
+# effective at midnight. Filled by backfill on each update, so the current day lands
+# once the next update arrives (<=1 day tail lag).
+type NavDailySnapshot @index(fields: ["token", ["date", "DESC"]]) @index(fields: [["date", "DESC"]]) {
+  id: ID! # {chainId}_{oracle}_{date}
+  chainId: Int!
+  oracle: String! @index
+  token: String! @index
+  date: Int!
+  nav: BigInt!
+  decimals: Int!
+}
