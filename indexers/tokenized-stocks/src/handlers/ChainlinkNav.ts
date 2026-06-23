@@ -34,13 +34,16 @@ const FEEDS: Record<string, { token: string; decimals: number }> = {
 indexer.onEvent(
   { contract: "ChainlinkNavFeed", event: "AnswerUpdated" },
   async ({ event, context }) => {
-    const feed = FEEDS[event.srcAddress];
+    // Envio delivers `srcAddress` EIP-55 checksummed; FEEDS keys (and the oracle
+    // key used by navShared) are lowercased, so normalise before lookup/storage.
+    const oracle = event.srcAddress.toLowerCase();
+    const feed = FEEDS[oracle];
     if (!feed) return; // unmapped aggregator — ignore
 
     await recordNav({
       context,
       chainId: event.chainId,
-      oracle: event.srcAddress,
+      oracle,
       token: feed.token,
       decimals: feed.decimals,
       nav: event.params.current,

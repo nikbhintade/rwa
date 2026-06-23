@@ -4,10 +4,11 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 type Issuer = "backed" | "ondo";
 
-// Token symbol per contract address (lowercased). Backed xStocks share one address
-// across all chains; Ondo tokens have a distinct address per chain — every address is
-// globally unique, so a flat address->symbol map is unambiguous. Unknown addresses
-// fall back to the raw address (should not happen for configured contracts).
+// Token symbol per contract address (keys lowercased). Backed xStocks share one
+// address across all chains; Ondo tokens have a distinct address per chain — every
+// address is globally unique, so a flat address->symbol map is unambiguous. Look up
+// with a lowercased address: Envio delivers `srcAddress` EIP-55 checksummed, so an
+// un-normalised lookup misses and falls back to the raw address.
 const SYMBOLS: Record<string, string> = {
   // --- Backed xStocks (same address on every chain) ---
   "0x1aad217b8f78dba5e6693460e8470f8b1a3977f3": "STRCx",
@@ -100,7 +101,7 @@ async function handleTransfer(
     id: tokenId,
     chainId,
     address: tokenAddress,
-    symbol: SYMBOLS[tokenAddress] ?? tokenAddress,
+    symbol: SYMBOLS[tokenAddress.toLowerCase()] ?? tokenAddress,
     issuer,
     totalSupply: newTotalSupply,
     lastDayId: currentDayId,

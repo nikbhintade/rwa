@@ -7,11 +7,13 @@ const ZERO_ADDRESS =
 const CHAIN_ID = 1;
 
 // Token address — must match one in config.yaml. TSLAx (Backed xStock).
+// Checksummed on purpose: Envio delivers `srcAddress` EIP-55 checksummed, so the
+// handlers must normalise before their lowercase address->symbol/feed lookups.
 const TOKEN_ADDRESS =
-  "0x8ad3c73f833d3f9a523ab01476625f269aeb7cf0" as `0x${string}`;
+  "0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0" as `0x${string}`;
 // TSLA / USD Chainlink aggregator (AnswerUpdated emitter) — NAV source for TSLAx.
 const TSLA_AGG =
-  "0x47f0840acb50df9c3b9584017ef1a9560e777b88" as `0x${string}`;
+  "0x47f0840aCB50DF9C3B9584017eF1A9560E777b88" as `0x${string}`;
 
 const DAY_0_TIMESTAMP = 86400 * 20000; // day 20000
 const DAY_1_TIMESTAMP = 86400 * 20001; // day 20001
@@ -212,7 +214,7 @@ describe("Ondo issuer", () => {
   it("tags OndoStocks transfers as the ondo issuer", async () => {
     const indexer = createTestIndexer();
     const receiver = Addresses.mockAddresses[0]! as `0x${string}`;
-    const spyon = "0xfedc5f4a6c38211c1338aa411018dfaf26612c08" as `0x${string}`;
+    const spyon = "0xFeDC5f4a6c38211c1338aa411018DFAf26612c08" as `0x${string}`;
 
     await indexer.process({
       chains: {
@@ -261,7 +263,11 @@ describe("NAV (Chainlink AnswerUpdated)", () => {
       },
     });
 
-    const state = await indexer.NavOracleState.get(`${CHAIN_ID}_${TSLA_AGG}`);
+    // Oracle is keyed lowercased (navShared contract), so the state id uses the
+    // normalised aggregator address even though the event delivered it checksummed.
+    const state = await indexer.NavOracleState.get(
+      `${CHAIN_ID}_${TSLA_AGG.toLowerCase()}`,
+    );
     expect(state?.token).toBe("TSLAx");
     expect(state?.latestNav).toBe(nav);
     expect(state?.decimals).toBe(8);
