@@ -9,12 +9,13 @@ import { Sparkline } from "./Sparkline";
 type SortKey = "transfer" | "supply";
 type SortDir = "asc" | "desc";
 
-// Only stablecoins are live; the rest are gated off ("Soon") for now.
+// Stablecoins and tokenized stocks are live; treasuries/credit are gated off
+// ("Soon") for now.
 const ASSET_CLASSES: { id: AssetClass; label: string; enabled: boolean }[] = [
   { id: "stablecoin", label: "Stablecoins", enabled: true },
+  { id: "stock", label: "Tokenized Stocks", enabled: true },
   { id: "treasury", label: "US Treasuries", enabled: false },
   { id: "credit", label: "Tokenized Credit", enabled: false },
-  { id: "stock", label: "Tokenized Stocks", enabled: false },
 ];
 
 type Props = {

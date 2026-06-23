@@ -6,8 +6,10 @@ import type { Token } from "../types";
 // comments are not always correct (Arbitrum 0x4685… is PYUSD, not DAI).
 //
 // `assetClass` is dashboard-side classification only; it is never sent in a
-// GraphQL query (the indexer is queried by address). US Treasuries are listed
-// but gated off in the UI for now.
+// GraphQL query (the indexer is queried by address). It also picks the endpoint:
+// `stock` tokens hit the separate tokenized-stocks indexer, everything else the
+// default one (see endpointFor in lib/gql). US Treasuries are listed but gated
+// off in the UI for now; stablecoins and stocks are live.
 export const tokens: Token[] = [
   {
     id: "usdt",
@@ -303,6 +305,131 @@ export const tokens: Token[] = [
     assetClass: "treasury",
     chains: [
       { chainId: 1, address: "0x48aB4e39AC59F4E88974804B04A991b3a402717f", decimals: 18 },
+    ],
+  },
+
+  // --- Tokenized stocks (served by the separate tokenized-stocks indexer) ---
+  // All 18 decimals. Addresses are checksummed — that indexer filters by exact
+  // address, so the casing must match. Chain lists mirror live deployments.
+  //
+  // Backed Finance xStocks: 1:1 backed, same token address on every chain.
+  {
+    id: "strcx",
+    symbol: "STRCx",
+    name: "Strategy xStock",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0x1Aad217B8F78dbA5E6693460e8470F8b1A3977f3", decimals: 18 },
+      { chainId: 56, address: "0x1Aad217B8F78dbA5E6693460e8470F8b1A3977f3", decimals: 18 },
+      { chainId: 5000, address: "0x1Aad217B8F78dbA5E6693460e8470F8b1A3977f3", decimals: 18 },
+      { chainId: 42161, address: "0x1Aad217B8F78dbA5E6693460e8470F8b1A3977f3", decimals: 18 },
+      { chainId: 57073, address: "0x1Aad217B8F78dbA5E6693460e8470F8b1A3977f3", decimals: 18 },
+    ],
+  },
+  {
+    id: "tslax",
+    symbol: "TSLAx",
+    name: "Tesla xStock",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0", decimals: 18 },
+      { chainId: 56, address: "0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0", decimals: 18 },
+      { chainId: 999, address: "0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0", decimals: 18 },
+      { chainId: 5000, address: "0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0", decimals: 18 },
+      { chainId: 42161, address: "0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0", decimals: 18 },
+      { chainId: 57073, address: "0x8aD3c73F833d3F9A523aB01476625F269aEB7Cf0", decimals: 18 },
+    ],
+  },
+  {
+    id: "crclx",
+    symbol: "CRCLx",
+    name: "Circle xStock",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0xfEbDEd1B0986a8ee107f5AB1a1c5a813491DeCEB", decimals: 18 },
+      { chainId: 10, address: "0xfEbDEd1B0986a8ee107f5AB1a1c5a813491DeCEB", decimals: 18 },
+      { chainId: 56, address: "0xfEbDEd1B0986a8ee107f5AB1a1c5a813491DeCEB", decimals: 18 },
+      { chainId: 999, address: "0xfEbDEd1B0986a8ee107f5AB1a1c5a813491DeCEB", decimals: 18 },
+      { chainId: 5000, address: "0xfEbDEd1B0986a8ee107f5AB1a1c5a813491DeCEB", decimals: 18 },
+      { chainId: 42161, address: "0xfEbDEd1B0986a8ee107f5AB1a1c5a813491DeCEB", decimals: 18 },
+      { chainId: 57073, address: "0xfEbDEd1B0986a8ee107f5AB1a1c5a813491DeCEB", decimals: 18 },
+    ],
+  },
+  // Ondo Global Markets (*on): total-return tokens, one address per chain.
+  {
+    id: "spyon",
+    symbol: "SPYon",
+    name: "Ondo S&P 500 ETF (SPY)",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0xFeDC5f4a6c38211c1338aa411018DFAf26612c08", decimals: 18 },
+      { chainId: 56, address: "0x6a708EAD771238919D85930b5a0f10454E1C331a", decimals: 18 },
+      { chainId: 999, address: "0x32eC2792aeC02122eDD9f28866B720db1e1c1B54", decimals: 18 },
+    ],
+  },
+  {
+    id: "qqqon",
+    symbol: "QQQon",
+    name: "Ondo Nasdaq-100 ETF (QQQ)",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0x0e397938C1Aa0680954093495B70A9F5e2249aBa", decimals: 18 },
+      { chainId: 56, address: "0x0cdE6936d305d5B34667fC46425E852efd73559a", decimals: 18 },
+      { chainId: 999, address: "0x911e2dCD2b70F44231F3F0f1C6ec9aF75068FD85", decimals: 18 },
+    ],
+  },
+  {
+    id: "nvdaon",
+    symbol: "NVDAon",
+    name: "Ondo NVIDIA",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0x2D1F7226Bd1F780AF6B9A49DCC0aE00E8Df4bDEE", decimals: 18 },
+      { chainId: 56, address: "0xA9eE28C80f960B889dFbd1902055218cBa016F75", decimals: 18 },
+      { chainId: 999, address: "0xB989ad9b91886b1Aaed8DaADb26F028b29b40945", decimals: 18 },
+    ],
+  },
+  {
+    id: "ivvon",
+    symbol: "IVVon",
+    name: "Ondo iShares S&P 500 (IVV)",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0x62cA254a363dc3c748e7E955c20447aB5bF06fF7", decimals: 18 },
+      { chainId: 56, address: "0x1104EB7e85E25eB45F88e638b0C27A06C1A91CB2", decimals: 18 },
+      { chainId: 999, address: "0xAd26B6048cc3682f67Fe4C829b7Ac99dbF95920e", decimals: 18 },
+    ],
+  },
+  {
+    id: "muon",
+    symbol: "MUon",
+    name: "Ondo Micron",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0x050362Ab1072Cb2Ce74d74770E22A3203Ad04ee5", decimals: 18 },
+      { chainId: 56, address: "0x8b6ACf6041A81567f012Ff6A4C6D96d5818d74bF", decimals: 18 },
+      { chainId: 999, address: "0x0f8E33F5CdefAE9C2E59de8fB61feD347046D046", decimals: 18 },
+    ],
+  },
+  {
+    id: "crclon",
+    symbol: "CRCLon",
+    name: "Ondo Circle",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0x3632DEa96A953C11dac2f00b4A05a32CD1063fAE", decimals: 18 },
+      { chainId: 56, address: "0x992879Cd8ce0c312d98648875B5A8D6D042cbF34", decimals: 18 },
+      { chainId: 999, address: "0x13a81c5e8b4AB05Fc721DfF7bA95e250b29458F8", decimals: 18 },
+    ],
+  },
+  {
+    id: "himson",
+    symbol: "HIMSon",
+    name: "Ondo Hims & Hers",
+    assetClass: "stock",
+    chains: [
+      { chainId: 1, address: "0xCa468554e5C0423Ee858fe3942c9568C51FcAa79", decimals: 18 },
+      { chainId: 56, address: "0x4693f6F5EF257381a28afd0673e64d8b32d5C6aD", decimals: 18 },
     ],
   },
 ];

@@ -1,7 +1,29 @@
-import type { ChainSeries, ChainToken, Token, TokenDay, TokenStats } from "../types";
+import type {
+  ChainSeries,
+  ChainToken,
+  NavPoint,
+  NavStats,
+  Token,
+  TokenDay,
+  TokenStats,
+} from "../types";
 
-export async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const res = await fetch("/api/graphql", {
+/** Each asset class is served by its own indexer behind a dedicated proxy path. */
+export const STABLECOIN_ENDPOINT = "/api/graphql";
+export const STOCKS_ENDPOINT = "/api/graphql-stocks";
+
+/** Tokenized stocks live in a separate indexer; everything else (stablecoins,
+ *  treasuries) shares the default endpoint. */
+export function endpointFor(token: Token): string {
+  return token.assetClass === "stock" ? STOCKS_ENDPOINT : STABLECOIN_ENDPOINT;
+}
+
+export async function gql<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+  endpoint: string = STABLECOIN_ENDPOINT,
+): Promise<T> {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query, variables }),
@@ -91,11 +113,15 @@ function uniqueAddrs(tokens: Token[]): string[] {
   return [...set];
 }
 
-/** Per-chain 7-day stats for every deployment, keyed by `${chainId}:${address}`. */
-export async function fetchAllStats(tokens: Token[]): Promise<ChainStatsMap> {
+/** Per-chain 7-day stats for every deployment, keyed by `${chainId}:${address}`.
+ *  `tokens` must all target the same `endpoint` (queried by address `_in`). */
+export async function fetchAllStats(
+  tokens: Token[],
+  endpoint: string = STABLECOIN_ENDPOINT,
+): Promise<ChainStatsMap> {
   const addrs = uniqueAddrs(tokens);
   const minDate = todayMidnightSecs() - 7 * DAY_SECS;
-  const data = await gql<BatchRaw>(BATCH_QUERY, { addrs, minDate });
+  const data = await gql<BatchRaw>(BATCH_QUERY, { addrs, minDate }, endpoint);
   const index = deploymentIndex(tokens);
 
   const result: ChainStatsMap = {};
@@ -152,12 +178,56 @@ function toDay(d: DayRaw, decimals: number): TokenDay {
   };
 }
 
-/** 365-day stats for one logical token: per-chain series plus a summed aggregate. */
+// NAV (price) is keyed by token symbol — one Chainlink feed prices a stock across
+// every chain it lives on. NavOracleState holds the latest print; NavDailySnapshot
+// the backfilled 00:00 UTC series. Both are 8-decimal USD.
+const NAV_QUERY = `query Nav($token: String!, $minDate: Int!) {
+  NavOracleState(where: {token: {_eq: $token}}, order_by: {latestUpdatedAt: desc}) {
+    latestNav
+    decimals
+    latestUpdatedAt
+  }
+  NavDailySnapshot(
+    where: {token: {_eq: $token}, date: {_gte: $minDate}}
+    order_by: {date: asc}
+  ) {
+    date
+    nav
+    decimals
+  }
+}`;
+
+type NavStateRaw = { latestNav: string; decimals: number; latestUpdatedAt: string };
+type NavSnapRaw = { date: number; nav: string; decimals: number };
+type NavRaw = { NavOracleState: NavStateRaw[]; NavDailySnapshot: NavSnapRaw[] };
+
+/** Latest + daily NAV for a stock symbol. Empty (latest null, no days) when the
+ *  token has no feed or the indexer hasn't recorded NAV yet. */
+async function fetchNav(symbol: string, minDate: number, endpoint: string): Promise<NavStats> {
+  const data = await gql<NavRaw>(NAV_QUERY, { token: symbol, minDate }, endpoint);
+  const state = data.NavOracleState[0];
+  const latest = state ? formatUnits(state.latestNav, state.decimals) : null;
+  const latestUpdatedAt = state ? Number(state.latestUpdatedAt) : null;
+  const days: NavPoint[] = data.NavDailySnapshot.map((d) => ({
+    date: d.date,
+    nav: formatUnits(d.nav, d.decimals),
+  }));
+  return { latest, latestUpdatedAt, days };
+}
+
+/** 365-day stats for one logical token: per-chain series plus a summed aggregate.
+ *  Stocks additionally carry their NAV/price series (fetched in parallel). */
 export async function fetchTokenDetail(token: Token): Promise<TokenStats> {
   const minDate = todayMidnightSecs() - 365 * DAY_SECS;
+  const endpoint = endpointFor(token);
   const chains = token.chains.filter(isIndexed);
   const addrs = chains.map((c) => c.address);
-  const data = await gql<BatchRaw>(DETAIL_QUERY, { addrs, minDate });
+  const [data, nav] = await Promise.all([
+    gql<BatchRaw>(DETAIL_QUERY, { addrs, minDate }, endpoint),
+    token.assetClass === "stock"
+      ? fetchNav(token.symbol, minDate, endpoint)
+      : Promise.resolve(undefined),
+  ]);
 
   const index = new Map<string, ChainToken>();
   for (const c of chains) index.set(chainKey(c.chainId, c.address), c);
@@ -196,7 +266,7 @@ export async function fetchTokenDetail(token: Token): Promise<TokenStats> {
     return (acc ?? 0) + s.totalSupply;
   }, null);
 
-  return { totalSupply, days: aggregateDays(byChain), byChain };
+  return { totalSupply, days: aggregateDays(byChain), byChain, nav };
 }
 
 /** Sum per-day metrics across a list of (possibly duplicate-dated) days. */
@@ -266,4 +336,10 @@ export function aggregateByTimeframe(days: TokenDay[], t: Timeframe): TokenDay[]
 /** The set of dates (unix secs) that fall in the selected timeframe window. */
 export function timeframeDates(aggregateDaysList: TokenDay[], t: Timeframe): number[] {
   return aggregateByTimeframe(aggregateDaysList, t).map((d) => d.date);
+}
+
+/** NAV points within the selected timeframe window (by date cutoff), ascending. */
+export function navInTimeframe(days: NavPoint[], t: Timeframe): NavPoint[] {
+  const cutoff = todayMidnightSecs() - timeframeLen(t) * DAY_SECS;
+  return days.filter((d) => d.date >= cutoff).sort((a, b) => a.date - b.date);
 }

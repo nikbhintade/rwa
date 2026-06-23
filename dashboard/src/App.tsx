@@ -6,6 +6,8 @@ import {
   assembleFromChainStats,
   fetchAllStats,
   fetchTokenDetail,
+  STABLECOIN_ENDPOINT,
+  STOCKS_ENDPOINT,
   type ChainStatsMap,
 } from "./lib/gql";
 import { buildHash, parseHash } from "./lib/router";
@@ -13,9 +15,10 @@ import type { Token, TokenStats } from "./types";
 
 const tokenById = new Map(tokens.map((t) => [t.id, t]));
 
-// Only stablecoins are surfaced for now; US Treasuries are gated off in the UI
-// and not yet indexed, so we don't query their stats.
-const activeTokens = tokens.filter((t) => t.assetClass === "stablecoin");
+// Live asset classes, grouped by which indexer serves them. Treasuries/credit
+// are gated off in the UI and not yet indexed, so we don't query their stats.
+const stablecoinTokens = tokens.filter((t) => t.assetClass === "stablecoin");
+const stockTokens = tokens.filter((t) => t.assetClass === "stock");
 
 function App() {
   const [selected, setSelected] = useState<Token | undefined>();
@@ -50,12 +53,30 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAllStats(activeTokens)
-      .then((s) => {
-        if (!cancelled) setStats(s);
-      })
-      .catch((e: Error) => {
-        if (!cancelled) setError(e.message);
+    // Each indexer is queried independently and the maps merged. allSettled keeps
+    // one endpoint's failure from blanking the other (keys never collide — they're
+    // chainId:address and the address sets are disjoint).
+    Promise.allSettled([
+      fetchAllStats(stablecoinTokens, STABLECOIN_ENDPOINT),
+      stockTokens.length
+        ? fetchAllStats(stockTokens, STOCKS_ENDPOINT)
+        : Promise.resolve<ChainStatsMap>({}),
+    ])
+      .then((results) => {
+        if (cancelled) return;
+        const merged: ChainStatsMap = {};
+        let anyOk = false;
+        let firstError: string | null = null;
+        for (const r of results) {
+          if (r.status === "fulfilled") {
+            Object.assign(merged, r.value);
+            anyOk = true;
+          } else if (!firstError) {
+            firstError = r.reason instanceof Error ? r.reason.message : String(r.reason);
+          }
+        }
+        setStats(merged);
+        if (!anyOk && firstError) setError(firstError);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

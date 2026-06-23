@@ -10,3 +10,19 @@ export function formatCompact(n: number): string {
 export function formatPct(n: number): string {
   return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
 }
+
+/** Compact USD for large values: $19.4M, $1.2B. */
+export function formatUsdCompact(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  return `$${formatCompact(n)}`;
+}
+
+/** Price-style USD with cents ($431.20); compacts above 1e6 to stay short. */
+export function formatUsdPrice(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 1e6) return `$${formatCompact(n)}`;
+  return `$${n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}

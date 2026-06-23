@@ -18,9 +18,11 @@ export const chains: Chain[] = [
   { id: 5000, name: "Mantle", short: "MNT", color: "#65B3AE", explorer: "https://mantlescan.xyz" },
   { id: 4217, name: "Tempo", short: "TMP", color: "#E76F51", explorer: "" },
   { id: 8453, name: "Base", short: "BASE", color: "#0052FF", explorer: "https://basescan.org" },
+  { id: 999, name: "HyperEVM", short: "HYPE", color: "#50D2C1", explorer: "https://hyperevmscan.io" },
   { id: 42161, name: "Arbitrum", short: "ARB", color: "#28A0F0", explorer: "https://arbiscan.io" },
   { id: 42220, name: "Celo", short: "CELO", color: "#FCC846", explorer: "https://celoscan.io" },
   { id: 43114, name: "Avalanche", short: "AVAX", color: "#E84142", explorer: "https://snowtrace.io" },
+  { id: 57073, name: "Ink", short: "INK", color: "#7B61FF", explorer: "https://explorer.inkonchain.com" },
   { id: 98866, name: "Plume", short: "PLUME", color: "#EC4899", explorer: "https://explorer.plume.org" },
 ];
 

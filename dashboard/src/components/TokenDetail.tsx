@@ -4,17 +4,20 @@ import {
   BarChart,
   Brush,
   CartesianGrid,
+  Line,
+  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { ChainSeries, Token, TokenDay, TokenStats } from "../types";
+import type { ChainSeries, NavStats, Token, TokenDay, TokenStats } from "../types";
 import { chainById, tokenExplorerUrl } from "../data/chains";
-import { formatCompact } from "../lib/format";
+import { formatCompact, formatUsdCompact, formatUsdPrice } from "../lib/format";
 import {
   aggregateByTimeframe,
+  navInTimeframe,
   timeframeDates,
   timeframeLen,
   type Timeframe,
@@ -22,7 +25,7 @@ import {
 import { exportData, type ExportFormat } from "../lib/export";
 import { shareUrl } from "../lib/router";
 
-type Tab = "count" | "volume" | "mintburn";
+type Tab = "count" | "volume" | "mintburn" | "nav";
 
 type Props = {
   token: Token;
@@ -50,6 +53,12 @@ export function TokenDetail({
   const loading = !detailStats;
   const stats = detailStats ?? sidebarStats;
 
+  const isStock = token.assetClass === "stock";
+  const nav = stats?.nav;
+  const navLatest = nav?.latest ?? null;
+  // A stock selection can leave `tab` on "nav"; clamp back for non-stocks.
+  const effectiveTab: Tab = !isStock && tab === "nav" ? "volume" : tab;
+
   const fullByChain = useMemo(() => stats?.byChain ?? [], [stats]);
 
   // Apply the chain filter: scope every metric to the selected chain (or all).
@@ -68,6 +77,9 @@ export function TokenDetail({
     if (chainFilter == null) return stats?.totalSupply ?? null;
     return byChain[0]?.totalSupply ?? null;
   }, [stats, chainFilter, byChain]);
+
+  // Total Asset Value = supply × NAV (scoped to the chain filter, like supply).
+  const tav = navLatest != null && supply != null ? supply * navLatest : null;
 
   const activeStats: TokenStats | undefined = useMemo(
     () => (stats ? { totalSupply: supply, days: allDays, byChain } : undefined),
@@ -181,6 +193,26 @@ export function TokenDetail({
       </header>
 
       <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {isStock && (
+          <>
+            <StatBox
+              label="Net Asset Value"
+              value={navLatest != null ? formatUsdPrice(navLatest) : null}
+              sub={
+                navLatest == null
+                  ? loading
+                    ? undefined
+                    : "no price feed"
+                  : `updated ${timeAgo(nav?.latestUpdatedAt ?? null)}`
+              }
+            />
+            <StatBox
+              label="Total Asset Value"
+              value={tav != null ? formatUsdCompact(tav) : null}
+              sub={tav != null && supply != null ? `${formatCompact(supply)} × ${formatUsdPrice(navLatest!)}` : undefined}
+            />
+          </>
+        )}
         <StatBox
           label="Total Supply"
           value={supply != null ? formatCompact(supply) : null}
@@ -199,6 +231,10 @@ export function TokenDetail({
         />
       </div>
 
+      {isStock && navLatest != null && (
+        <TavByChain byChain={byChain} nav={navLatest} />
+      )}
+
       <section className="flex w-full flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TimeframeToggle value={timeframe} onChange={setTimeframe} />
@@ -210,16 +246,25 @@ export function TokenDetail({
           />
         </div>
 
-        <Tabs value={tab} onChange={setTab} />
+        <Tabs value={effectiveTab} onChange={setTab} includeNav={isStock} />
 
-        {chainMetas.length > 0 && <ChainLegend chains={chainMetas} />}
+        {chainMetas.length > 0 && effectiveTab !== "nav" && (
+          <ChainLegend chains={chainMetas} />
+        )}
 
         <div className="w-full rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-5">
-          {windowDates.length === 0 ? (
+          {effectiveTab === "nav" ? (
+            <NavLineChart
+              nav={nav}
+              timeframe={timeframe}
+              symbol={token.symbol}
+              loading={loading}
+            />
+          ) : windowDates.length === 0 ? (
             <div className="py-12 text-center text-[12px] text-[var(--color-text-muted)]">
               {loading ? "Loading…" : "No data"}
             </div>
-          ) : tab === "count" ? (
+          ) : effectiveTab === "count" ? (
             <StackedSeriesChart
               byChain={byChain}
               chains={chainMetas}
@@ -231,7 +276,7 @@ export function TokenDetail({
               label="Transfers"
               isCount
             />
-          ) : tab === "volume" ? (
+          ) : effectiveTab === "volume" ? (
             <StackedSeriesChart
               byChain={byChain}
               chains={chainMetas}
@@ -467,11 +512,20 @@ function DownloadMenu({
   );
 }
 
-function Tabs({ value, onChange }: { value: Tab; onChange: (t: Tab) => void }) {
+function Tabs({
+  value,
+  onChange,
+  includeNav,
+}: {
+  value: Tab;
+  onChange: (t: Tab) => void;
+  includeNav?: boolean;
+}) {
   const tabs: { key: Tab; label: string }[] = [
     { key: "volume", label: "Volume" },
     { key: "count", label: "Transfers" },
     { key: "mintburn", label: "Mint / Burn" },
+    ...(includeNav ? [{ key: "nav" as const, label: "NAV" }] : []),
   ];
   return (
     <div className="flex gap-6 border-b border-[var(--color-border-subtle)]">
@@ -500,11 +554,13 @@ function StatBox({
   value,
   unit,
   delta,
+  sub,
 }: {
   label: string;
   value: string | null;
   unit?: string;
   delta?: number | null;
+  sub?: string;
 }) {
   return (
     <div className="rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] px-4 py-3">
@@ -528,6 +584,11 @@ function StatBox({
           </>
         )}
       </div>
+      {sub && (
+        <div className="mt-1.5 font-mono text-[10px] text-[var(--color-text-muted)]">
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
@@ -889,6 +950,172 @@ function MintBurnTooltip({
       <div className="mt-1 text-[9px] text-[var(--color-text-muted)]">{symbol}</div>
     </div>
   );
+}
+
+function TavByChain({ byChain, nav }: { byChain: ChainSeries[]; nav: number }) {
+  const rows = byChain
+    .filter((s) => s.totalSupply != null)
+    .map((s) => ({ chainId: s.chainId, tav: (s.totalSupply ?? 0) * nav }))
+    .sort((a, b) => b.tav - a.tav);
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px]">
+      <span className="font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+        TAV by chain
+      </span>
+      {rows.map((r) => {
+        const c = chainById(r.chainId);
+        return (
+          <span key={r.chainId} className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rounded-[2px]"
+              style={{ background: c.color }}
+              aria-hidden="true"
+            />
+            <span className="text-[var(--color-text-secondary)]">{c.name}</span>
+            <span className="font-mono tabular-nums text-[var(--color-text-primary)]">
+              {formatUsdCompact(r.tav)}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function NavLineChart({
+  nav,
+  timeframe,
+  symbol,
+  loading,
+}: {
+  nav?: NavStats;
+  timeframe: Timeframe;
+  symbol: string;
+  loading: boolean;
+}) {
+  const points = useMemo(
+    () => (nav ? navInTimeframe(nav.days, timeframe) : []),
+    [nav, timeframe],
+  );
+
+  if (!nav || nav.latest == null) {
+    return (
+      <div className="py-12 text-center text-[12px] text-[var(--color-text-muted)]">
+        {loading ? "Loading…" : `No price feed for ${symbol}`}
+      </div>
+    );
+  }
+  if (points.length === 0) {
+    return (
+      <div className="py-12 text-center text-[12px] text-[var(--color-text-muted)]">
+        {loading ? "Loading…" : "No NAV data in this period"}
+      </div>
+    );
+  }
+
+  const data = points.map((p) => ({
+    date: p.date,
+    label: formatAxis(p.date),
+    nav: p.nav,
+  }));
+  const values = points.map((p) => p.nav);
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  // Pad the domain so a near-flat series isn't pinned to the axes.
+  const pad = (hi - lo) * 0.08 || hi * 0.02 || 1;
+  const yearly = timeframe === "yearly";
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+          NAV · {tfLabel(timeframe)} · USD
+        </span>
+        <span className="font-mono text-[10px] text-[var(--color-text-muted)]">
+          last {formatUsdPrice(nav.latest)} · range {formatUsdPrice(lo)}–
+          {formatUsdPrice(hi)}
+        </span>
+      </div>
+      <ResponsiveContainer width="100%" height={yearly ? 320 : 260}>
+        <LineChart
+          data={data}
+          margin={{ top: 8, right: 12, left: 8, bottom: yearly ? 28 : 8 }}
+        >
+          <CartesianGrid
+            strokeDasharray="2 4"
+            stroke="var(--color-border-subtle)"
+            vertical={false}
+          />
+          <XAxis
+            dataKey="label"
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={{ stroke: "var(--color-border-default)" }}
+            interval="preserveStartEnd"
+            minTickGap={yearly ? 40 : 20}
+          />
+          <YAxis
+            stroke="var(--color-text-muted)"
+            tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => formatUsdPrice(Number(v))}
+            width={64}
+            domain={[lo - pad, hi + pad]}
+          />
+          <Tooltip
+            cursor={{ stroke: "var(--color-border-strong)", strokeWidth: 1 }}
+            contentStyle={TOOLTIP_STYLE}
+            content={<NavTooltip />}
+          />
+          <Line
+            type="monotone"
+            dataKey="nav"
+            stroke="var(--color-accent)"
+            strokeWidth={1.5}
+            dot={false}
+            isAnimationActive={false}
+          />
+          {yearly && (
+            <Brush
+              dataKey="label"
+              height={22}
+              stroke="var(--color-border-strong)"
+              fill="var(--color-bg-base)"
+              travellerWidth={8}
+              tickFormatter={() => ""}
+              y={290}
+            />
+          )}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function NavTooltip({ active, label, payload }: TooltipProps) {
+  if (!active || !payload?.length) return null;
+  const v = Number(payload[0]?.value ?? 0);
+  return (
+    <div style={TOOLTIP_STYLE}>
+      <div className="mb-1 text-[10px] uppercase tracking-[0.06em] text-[var(--color-text-tertiary)]">
+        {label}
+      </div>
+      <div className="text-[var(--color-text-primary)]">{formatUsdPrice(v)}</div>
+    </div>
+  );
+}
+
+/** Coarse "Nh ago" / "Nd ago" from a unix-seconds timestamp. */
+function timeAgo(secs: number | null): string {
+  if (secs == null) return "—";
+  const diff = Math.floor(Date.now() / 1000) - secs;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 function safe(v: number): number {

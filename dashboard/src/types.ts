@@ -36,6 +36,23 @@ export type ChainSeries = {
   days: TokenDay[];
 };
 
+/** A single daily NAV (price) point for a tokenized stock, in USD. */
+export type NavPoint = {
+  date: number;
+  nav: number;
+};
+
+/** On-chain NAV (price) for a tokenized stock, from Chainlink push feeds. Only
+ *  the subset of stocks with a published feed carries this. */
+export type NavStats = {
+  /** Latest NAV (USD per token); null when no feed or no data yet. */
+  latest: number | null;
+  /** Unix seconds of the latest NAV print. */
+  latestUpdatedAt: number | null;
+  /** Daily NAV series (USD), ascending by date. */
+  days: NavPoint[];
+};
+
 export type TokenStats = {
   /** Supply summed across all chains. */
   totalSupply: number | null;
@@ -43,4 +60,6 @@ export type TokenStats = {
   days: TokenDay[];
   /** Per-chain breakdown. */
   byChain: ChainSeries[];
+  /** NAV/price series — tokenized stocks only. */
+  nav?: NavStats;
 };
