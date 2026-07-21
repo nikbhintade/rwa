@@ -35,3 +35,4 @@ generated
 .env
 .pnpm-store
 abis/
+.envio/
